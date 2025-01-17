@@ -7,13 +7,15 @@ import time
 import singer
 import singer.metadata as metadata
 import singer.metrics as metrics
+from custom_logger import user_logger
 from singer import get_bookmark, utils, write_message
 from singer.schema import Schema
 
 import tap_oracle.db as orc_db
 import tap_oracle.sync_strategies.common as common
 
-LOGGER = singer.get_logger()
+# LOGGER = singer.get_logger()
+LOGGER = user_logger
 
 UPDATE_BOOKMARK_PERIOD = 1000
 # An offset value that can be configured to shift the incremental filter clause

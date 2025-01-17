@@ -1,8 +1,10 @@
 import singer
+from custom_logger import user_logger
 
 from tap_oracle.connection_helper import SQLNET_ORA_CONFIG, oracledb
 
-LOGGER = singer.get_logger()
+# LOGGER = singer.get_logger()
+LOGGER = user_logger
 
 
 def fully_qualified_column_name(schema, table, column):

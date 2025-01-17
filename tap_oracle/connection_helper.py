@@ -18,9 +18,11 @@ Copyright (c) 2020, Vitor Avancini
 import enum
 import os
 
+from custom_logger import user_logger
 from singer import get_logger, utils
 
-LOGGER = get_logger()
+# LOGGER = singer.get_logger()
+LOGGER = user_logger
 
 REQUIRED_CONFIG_KEYS = ["host", "port", "user", "password"]
 
