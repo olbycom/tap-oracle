@@ -1,0 +1,7 @@
+{
+  "name": "tap-oracle",
+  "variant": "s7clarke10",
+  "pip_url": "-e ./extract/tap-oracle",
+  "executable": "tap-oracle",
+  "capabilities": ["state", "catalog", "discover", "log-based"]
+}
