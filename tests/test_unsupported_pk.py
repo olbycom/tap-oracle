@@ -6,17 +6,33 @@ import sys
 import unittest
 
 import singer
-import tap_oracle
 from singer import get_logger, metadata, write_bookmark
 
+import tap_oracle
+
 try:
-    from tests.utils import (crud_up_log_miner_fixtures, ensure_test_table,
-                             get_test_conn_config, get_test_connection,
-                             insert_record, select_all_of_stream,
-                             set_replication_method_for_stream,
-                             unselect_column, verify_crud_messages)
+    from tests.utils import (
+        crud_up_log_miner_fixtures,
+        ensure_test_table,
+        get_test_conn_config,
+        get_test_connection,
+        insert_record,
+        select_all_of_stream,
+        set_replication_method_for_stream,
+        unselect_column,
+        verify_crud_messages,
+    )
 except ImportError:
-    from utils import get_test_connection, ensure_test_table, select_all_of_stream, set_replication_method_for_stream, crud_up_log_miner_fixtures, verify_crud_messages, insert_record, unselect_column
+    from utils import (
+        get_test_connection,
+        ensure_test_table,
+        select_all_of_stream,
+        set_replication_method_for_stream,
+        crud_up_log_miner_fixtures,
+        verify_crud_messages,
+        insert_record,
+        unselect_column,
+    )
 
 import copy
 import decimal
@@ -24,6 +40,7 @@ import math
 
 import pytz
 import strict_rfc3339
+
 import tap_oracle.sync_strategies.full_table as full_table
 import tap_oracle.sync_strategies.log_miner as log_miner
 
@@ -35,28 +52,34 @@ CAUGHT_MESSAGES = []
 def do_not_dump_catalog(catalog):
     pass
 
+
 def singer_write_message(message):
     CAUGHT_MESSAGES.append(message)
 
+
 def expected_record(fixture_row):
     expected_record = {}
-    for k,v in fixture_row.items():
-        expected_record[k.replace('"', '')] = v
+    for k, v in fixture_row.items():
+        expected_record[k.replace('"', "")] = v
 
     return expected_record
 
+
 class UnsupportedPK(unittest.TestCase):
     maxDiff = None
+
     def setUp(self):
         tap_oracle.dump_catalog = do_not_dump_catalog
         full_table.UPDATE_BOOKMARK_PERIOD = 1000
         with get_test_connection() as conn:
             cur = conn.cursor()
-            table_spec = {"columns": [{"name": "interval_column", "type": "INTERVAL DAY TO SECOND",
-                                       "primary_key": True },
-                                      {"name": "age", "type": "integer"}            ],
-                          "name": "CHICKEN"}
-
+            table_spec = {
+                "columns": [
+                    {"name": "interval_column", "type": "INTERVAL DAY TO SECOND", "primary_key": True},
+                    {"name": "age", "type": "integer"},
+                ],
+                "name": "CHICKEN",
+            }
 
             ensure_test_table(table_spec)
 
@@ -67,36 +90,48 @@ class UnsupportedPK(unittest.TestCase):
             conn.autocommit = True
 
             catalog = tap_oracle.do_discovery(get_test_conn_config(), [])
-            chicken_stream = [s for s in catalog.streams if s.table == 'CHICKEN'][0]
+            chicken_stream = [s for s in catalog.streams if s.table == "CHICKEN"][0]
             mdata = metadata.to_map(chicken_stream.metadata)
 
-            self.assertEqual(mdata,
-                             {('properties', 'AGE'): {'inclusion': 'available',
-                                                      'selected-by-default': True,
-                                                      'sql-datatype': 'NUMBER'},
-                              (): {'is-view': False, 'row-count': 0,
-                                   'table-key-properties': [],
-                                   'schema-name': 'ROOT',
-                                   'database-name': os.getenv('TAP_ORACLE_SID')},
-                              ('properties', 'INTERVAL_COLUMN'): {'inclusion': 'unsupported',
-                                                                  'selected-by-default': False,
-                                                                  'sql-datatype': 'INTERVAL DAY(2) TO SECOND(6)'}})
+            self.assertEqual(
+                mdata,
+                {
+                    ("properties", "AGE"): {
+                        "inclusion": "available",
+                        "selected-by-default": True,
+                        "sql-datatype": "NUMBER",
+                    },
+                    (): {
+                        "is-view": False,
+                        "row-count": 0,
+                        "table-key-properties": [],
+                        "schema-name": "ROOT",
+                        "database-name": os.getenv("TAP_ORACLE_SID"),
+                    },
+                    ("properties", "INTERVAL_COLUMN"): {
+                        "inclusion": "unsupported",
+                        "selected-by-default": False,
+                        "sql-datatype": "INTERVAL DAY(2) TO SECOND(6)",
+                    },
+                },
+            )
 
             chicken_stream = select_all_of_stream(chicken_stream)
 
-            chicken_stream = set_replication_method_for_stream(chicken_stream, 'FULL_TABLE')
+            chicken_stream = set_replication_method_for_stream(chicken_stream, "FULL_TABLE")
             cur = conn.cursor()
 
-            cur.execute("""
+            cur.execute(
+                """
                INSERT INTO CHICKEN (AGE, INTERVAL_COLUMN) values (3,
                    TIMESTAMP '2001-09-04 17:00:00.000000' - TIMESTAMP '2001-09-03 17:00:00.000000'
-               )""")
+               )"""
+            )
 
             state = {}
             tap_oracle.do_sync(get_test_conn_config(), catalog, None, state)
 
-
-            #messages: ActivateVersion, SchemaMessage, Record, Record, State, ActivateVersion
+            # messages: ActivateVersion, SchemaMessage, Record, Record, State, ActivateVersion
             self.assertEqual(6, len(CAUGHT_MESSAGES))
             self.assertTrue(isinstance(CAUGHT_MESSAGES[0], singer.SchemaMessage))
 
@@ -104,14 +139,12 @@ class UnsupportedPK(unittest.TestCase):
             self.assertTrue(isinstance(CAUGHT_MESSAGES[1], singer.StateMessage))
             self.assertTrue(isinstance(CAUGHT_MESSAGES[2], singer.ActivateVersionMessage))
             self.assertTrue(isinstance(CAUGHT_MESSAGES[3], singer.RecordMessage))
-            self.assertEqual({'AGE': 3}, CAUGHT_MESSAGES[3].record)
+            self.assertEqual({"AGE": 3}, CAUGHT_MESSAGES[3].record)
             self.assertTrue(isinstance(CAUGHT_MESSAGES[4], singer.ActivateVersionMessage))
             self.assertTrue(isinstance(CAUGHT_MESSAGES[5], singer.StateMessage))
 
 
-
-
-if __name__== "__main__":
+if __name__ == "__main__":
     test1 = UnsupportedPK()
     test1.setUp()
     test1.test_catalog()

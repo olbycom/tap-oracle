@@ -1,28 +1,31 @@
 #!/usr/bin/env python3
 # pylint: disable=missing-docstring,not-an-iterable,too-many-locals,too-many-arguments,invalid-name
 
+import collections
+import copy
 import datetime
-import pdb
+import itertools
 import json
 import os
+import pdb
+import ssl
 import sys
 import time
-import collections
-import itertools
 from itertools import dropwhile
-import copy
-import ssl
+
 import singer
 import singer.metrics as metrics
 import singer.schema
-from singer import utils, metadata, get_bookmark
-from singer.schema import Schema
+from singer import get_bookmark, metadata, utils
 from singer.catalog import Catalog, CatalogEntry
+from singer.schema import Schema
+
 import tap_oracle.db as orc_db
-import tap_oracle.sync_strategies.log_miner as log_miner
+import tap_oracle.sync_strategies.common as common
 import tap_oracle.sync_strategies.full_table as full_table
 import tap_oracle.sync_strategies.incremental as incremental
-import tap_oracle.sync_strategies.common as common
+import tap_oracle.sync_strategies.log_miner as log_miner
+
 LOGGER = singer.get_logger()
 
 #LogMiner do not support LONG, LONG RAW, CLOB, BLOB, NCLOB, ADT, or COLLECTION datatypes.

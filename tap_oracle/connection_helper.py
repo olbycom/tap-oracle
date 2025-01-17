@@ -14,6 +14,7 @@ Copyright (c) 2020, Vitor Avancini
   See the License for the specific language governing permissions and
   limitations under the License.
 """
+
 import enum
 import os
 
@@ -21,12 +22,8 @@ from singer import get_logger, utils
 
 LOGGER = get_logger()
 
-REQUIRED_CONFIG_KEYS = [
-    'host',
-    'port',
-    'user',
-    'password'
-]
+REQUIRED_CONFIG_KEYS = ["host", "port", "user", "password"]
+
 
 class OracleNetConfig(dict):
     """The sqlnet.ora file is only supported in the python-oracledb Thick mode.
@@ -69,18 +66,18 @@ class OracleNetConfig(dict):
     """
 
     keys = (
-        'ssl_server_cert_dn',
-        'ssl_server_dn_match',
-        'wallet_password',
-        'wallet_location',
-        'expire_time',
-        'https_proxy',
-        'https_proxy_port',
-        'retry_count',
-        'retry_delay',
-        'tcp_connect_timeout',
-        'config_dir',
-        'disable_oob'
+        "ssl_server_cert_dn",
+        "ssl_server_dn_match",
+        "wallet_password",
+        "wallet_location",
+        "expire_time",
+        "https_proxy",
+        "https_proxy_port",
+        "retry_count",
+        "retry_delay",
+        "tcp_connect_timeout",
+        "config_dir",
+        "disable_oob",
     )
 
     @classmethod
@@ -95,6 +92,7 @@ class OracleNetConfig(dict):
 
 class OracleDriverType(str, enum.Enum):
     """Database Driver Type"""
+
     THIN = "THIN"
     THICK = "THICK"
     CX_ORACLE = "CX"
@@ -104,10 +102,10 @@ SQLNET_ORA_CONFIG = None
 args = utils.parse_args(REQUIRED_CONFIG_KEYS)
 
 # Set the environment variable ORA_PYTHON_DRIVER_TYPE to one of "cx", "thin", or "thick":
-if os.getenv('ORA_PYTHON_DRIVER_TYPE'):
-   ORA_PYTHON_DRIVER_TYPE = os.getenv('ORA_PYTHON_DRIVER_TYPE').upper()
+if os.getenv("ORA_PYTHON_DRIVER_TYPE"):
+    ORA_PYTHON_DRIVER_TYPE = os.getenv("ORA_PYTHON_DRIVER_TYPE").upper()
 else:
-   ORA_PYTHON_DRIVER_TYPE = args.config.get('ora_python_driver_type', OracleDriverType.CX_ORACLE).upper()
+    ORA_PYTHON_DRIVER_TYPE = args.config.get("ora_python_driver_type", OracleDriverType.CX_ORACLE).upper()
 
 if ORA_PYTHON_DRIVER_TYPE == OracleDriverType.CX_ORACLE:
     LOGGER.info("Running in cx mode")
@@ -121,15 +119,14 @@ if ORA_PYTHON_DRIVER_TYPE == OracleDriverType.CX_ORACLE:
     import cx_Oracle as oracledb
 elif ORA_PYTHON_DRIVER_TYPE == OracleDriverType.THICK:
     import oracledb
+
     LOGGER.info("Running in thick mode")
     oracledb.init_oracle_client()
 elif ORA_PYTHON_DRIVER_TYPE == OracleDriverType.THIN:
     import oracledb
+
     SQLNET_ORA_CONFIG = OracleNetConfig.from_env()
     LOGGER.info("Running in thin mode")
 else:
-    exc = (
-        f"Invalid value set for ORA_PYTHON_DRIVER_TYPE\n"
-        f"Use any one of 'cx', 'thin', or 'thick'"
-    )
+    exc = f"Invalid value set for ORA_PYTHON_DRIVER_TYPE\n" f"Use any one of 'cx', 'thin', or 'thick'"
     LOGGER.critical(exc)
