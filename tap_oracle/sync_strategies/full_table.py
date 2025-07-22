@@ -7,7 +7,7 @@ import time
 import singer
 import singer.metadata as metadata
 import singer.metrics as metrics
-from custom_logger import user_logger
+from custom_logger import internal_logger, user_logger
 from singer import get_bookmark, utils, write_message
 from singer.schema import Schema
 
@@ -73,9 +73,9 @@ def sync_view(conn_config, stream, state, desired_columns):
                 )
                 singer.write_message(record_message)
                 counter.increment()
-        except orc_db.oracledb.DatabaseError as e:
-            LOGGER.error(f"Error executing query: {select_sql}")
-            LOGGER.exception(e)
+        except Exception as e:
+            LOGGER.error(f"Error executing query on view: {select_sql}")
+            internal_logger.exception(e)
             raise e
 
     # always send the activate version whether first run or subsequent
@@ -169,9 +169,9 @@ def sync_table(conn_config, stream, state, desired_columns):
                     singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
 
                 counter.increment()
-        except orc_db.oracledb.DatabaseError as e:
+        except Exception as e:
             LOGGER.error(f"Error executing query: {select_sql}")
-            LOGGER.exception(e)
+            internal_logger.exception(e)
             raise e
 
     state = singer.write_bookmark(state, stream.tap_stream_id, "ORA_ROWSCN", None)

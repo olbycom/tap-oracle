@@ -21,7 +21,7 @@ _ = custom_logger
 import singer
 import singer.metrics as metrics
 import singer.schema
-from custom_logger import user_logger
+from custom_logger import internal_logger, user_logger
 from singer import get_bookmark, metadata, utils
 from singer.catalog import Catalog, CatalogEntry
 from singer.schema import Schema
@@ -747,5 +747,6 @@ def main():
     try:
         main_impl()
     except Exception as exc:
-        LOGGER.exception(exc)
+        LOGGER.error(f"An exception occurred: {exc}")
+        internal_logger.exception(exc)
         raise exc
