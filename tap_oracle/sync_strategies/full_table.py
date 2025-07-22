@@ -66,12 +66,17 @@ def sync_view(conn_config, stream, state, desired_columns):
         select_sql = "SELECT {} FROM {}.{}".format(",".join(escaped_columns), escaped_schema, escaped_table)
 
         LOGGER.info("select %s", select_sql)
-        for row in cur.execute(select_sql):
-            record_message = common.row_to_singer_message(
-                stream, row, nascent_stream_version, desired_columns, time_extracted
-            )
-            singer.write_message(record_message)
-            counter.increment()
+        try:
+            for row in cur.execute(select_sql):
+                record_message = common.row_to_singer_message(
+                    stream, row, nascent_stream_version, desired_columns, time_extracted
+                )
+                singer.write_message(record_message)
+                counter.increment()
+        except orc_db.oracledb.DatabaseError as e:
+            LOGGER.error(f"Error executing query: {select_sql}")
+            LOGGER.exception(e)
+            raise e
 
     # always send the activate version whether first run or subsequent
     singer.write_message(activate_version_message)
@@ -149,20 +154,25 @@ def sync_table(conn_config, stream, state, desired_columns):
 
         rows_saved = 0
         LOGGER.info("select %s", select_sql)
-        for row in cur.execute(select_sql):
-            ora_rowscn = row[-1]
-            row = row[:-1]
-            record_message = common.row_to_singer_message(
-                stream, row, nascent_stream_version, desired_columns, time_extracted
-            )
+        try:
+            for row in cur.execute(select_sql):
+                ora_rowscn = row[-1]
+                row = row[:-1]
+                record_message = common.row_to_singer_message(
+                    stream, row, nascent_stream_version, desired_columns, time_extracted
+                )
 
-            singer.write_message(record_message)
-            state = singer.write_bookmark(state, stream.tap_stream_id, "ORA_ROWSCN", ora_rowscn)
-            rows_saved = rows_saved + 1
-            if rows_saved % UPDATE_BOOKMARK_PERIOD == 0:
-                singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
+                singer.write_message(record_message)
+                state = singer.write_bookmark(state, stream.tap_stream_id, "ORA_ROWSCN", ora_rowscn)
+                rows_saved = rows_saved + 1
+                if rows_saved % UPDATE_BOOKMARK_PERIOD == 0:
+                    singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
 
-            counter.increment()
+                counter.increment()
+        except orc_db.oracledb.DatabaseError as e:
+            LOGGER.error(f"Error executing query: {select_sql}")
+            LOGGER.exception(e)
+            raise e
 
     state = singer.write_bookmark(state, stream.tap_stream_id, "ORA_ROWSCN", None)
     # always send the activate version whether first run or subsequent
