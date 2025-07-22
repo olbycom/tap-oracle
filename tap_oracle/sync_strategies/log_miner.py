@@ -165,7 +165,8 @@ def sync_tables(conn_config, streams, state, end_scn, scn_window_size=None):
         except oracledb.DatabaseError as ex:
             cur.execute("DBMS_LOGMNR.END_LOGMNR()")
             cur.close()
-            LOGGER.warning(
+            LOGGER.error(f"Error ocurred when trying to sync tables {streams}: {ex}")
+            LOGGER.exception(
                 f"Exception at start_scn={start_scn_window} stop_scn={stop_scn_window} reduction_factor={reduction_factor}"
             )
             iter_with_reduction_factor = ITER_WITH_REDUCTION_FACTOR
