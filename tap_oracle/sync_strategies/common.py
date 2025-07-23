@@ -84,9 +84,20 @@ def OutputTypeHandler(cursor, name, defaultType, size, precision, scale):
 
 
 def prepare_columns_sql(stream, c):
-    column_name = """ "{}" """.format(c)
-    if "string" in stream.schema.properties[c].type and stream.schema.properties[c].format == "date-time":
-        return "to_char({})".format(column_name)
+    column_name = '"{}"'.format(c)
+    prop = stream.schema.properties[c]
+
+    if "string" in prop.type and prop.format == "date-time":
+        md_map = metadata.to_map(stream.metadata)
+        sql_datatype = md_map.get(("properties", c), {}).get("sql-datatype")
+
+        if sql_datatype == "DATE":
+            return 'to_char({}, \'YYYY-MM-DD"T"HH24:MI:SS"Z"\') AS {}'.format(column_name, column_name)
+        if sql_datatype and re.search(r"TIMESTAMP\([0-9]\) WITH (LOCAL )?TIME ZONE", sql_datatype):
+            return "to_char({}, 'YYYY-MM-DD\"T\"HH24:MI:SS.FF TZH:TZM') AS {}".format(column_name, column_name)
+        if sql_datatype and re.search(r"TIMESTAMP\([0-9]\)", sql_datatype):
+            return "to_char({}, 'YYYY-MM-DD\"T\"HH24:MI:SS.FF') AS {}".format(column_name, column_name)
+
     return column_name
 
 
