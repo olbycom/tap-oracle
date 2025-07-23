@@ -18,7 +18,7 @@ Copyright (c) 2020, Vitor Avancini
 import enum
 import os
 
-from custom_logger import user_logger
+from nekt_singer_sdk.custom_logger import user_logger
 from singer import get_logger, utils
 
 # LOGGER = singer.get_logger()

@@ -1,9 +1,7 @@
 import base64
-import datetime
 import decimal
 import re
 
-import dateutil.parser
 import singer
 from singer import metadata
 

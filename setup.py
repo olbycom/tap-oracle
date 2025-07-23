@@ -22,7 +22,7 @@ setup(
         "cx_Oracle==8.3;platform_system!='Darwin'",
         "oracledb>=1.4.2",
         "strict-rfc3339==0.7",
-        "custom-logger @ git+https://github.com/olbycom/nekt-custom-logger-module.git@v0.0.7#egg=custom-logger",
+        "nekt-singer-sdk @ git+https://github.com/nektcom/singer-sdk.git@v0.2.6#egg=nekt-singer-sdk",
     ],
     entry_points="""
           [console_scripts]

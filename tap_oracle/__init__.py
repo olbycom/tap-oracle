@@ -13,15 +13,10 @@ import sys
 import time
 from itertools import dropwhile
 
-import custom_logger
-
-_ = custom_logger
-
-
 import singer
 import singer.metrics as metrics
 import singer.schema
-from custom_logger import internal_logger, user_logger
+from nekt_singer_sdk.custom_logger import internal_logger, user_logger
 from singer import get_bookmark, metadata, utils
 from singer.catalog import Catalog, CatalogEntry
 from singer.schema import Schema

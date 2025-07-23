@@ -1,5 +1,5 @@
 import singer
-from custom_logger import user_logger
+from nekt_singer_sdk.custom_logger import user_logger
 
 from tap_oracle.connection_helper import SQLNET_ORA_CONFIG, oracledb
 

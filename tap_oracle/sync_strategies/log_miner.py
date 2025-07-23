@@ -10,7 +10,7 @@ import pytz
 import singer
 import singer.metadata as metadata
 import singer.metrics as metrics
-from custom_logger import user_logger
+from nekt_singer_sdk.custom_logger import user_logger
 from singer import get_bookmark, utils, write_message
 from singer.schema import Schema
 
