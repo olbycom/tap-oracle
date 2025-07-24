@@ -3,18 +3,12 @@
 
 import collections
 import copy
-import datetime
 import itertools
 import json
 import os
-import pdb
-import ssl
-import sys
-import time
-from itertools import dropwhile
+import re
 
 import singer
-import singer.metrics as metrics
 import singer.schema
 from nekt_singer_sdk.custom_logger import internal_logger, user_logger
 from singer import get_bookmark, metadata, utils
@@ -105,16 +99,22 @@ def schema_for_column(c, pks_for_table, use_singer_decimal):
             result.type = nullable_column(c.column_name, "number", pks_for_table)
         return result
 
+    # Exact match for DATE type
     elif data_type == "date":
         result.type = nullable_column(c.column_name, "string", pks_for_table)
-        result.description = "date"
         result.format = "date-time"
         return result
 
-    elif data_type.startswith("timestamp"):
+    # Regex for TIMESTAMP, TIMESTAMP WITH TIME ZONE, and TIMESTAMP WITH LOCAL TIME ZONE
+    elif re.match(r"timestamp.*", data_type):
         result.type = nullable_column(c.column_name, "string", pks_for_table)
-        result.description = "timestamp"
         result.format = "date-time"
+        return result
+
+    # Check for Oracle's XMLTYPE
+    elif data_type == "xmltype":
+        result.type = nullable_column(c.column_name, "string", pks_for_table)
+        result.description = "xmltype"
         return result
 
     elif data_type == "clob":
