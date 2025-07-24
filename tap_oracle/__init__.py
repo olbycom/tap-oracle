@@ -101,15 +101,8 @@ def schema_for_column(c, pks_for_table, use_singer_decimal):
     elif data_type == "number":
         if use_singer_decimal:  # Using custom `singer.decimal` string formatter, no opinion on scale/precision
             result.type = nullable_column(c.column_name, "string", pks_for_table)
-            result.format = "singer.decimal"
-            if not (numeric_scale == DEFAULT_NUMERIC_SCALE and numeric_precision == DEFAULT_NUMERIC_PRECISION):
-                result.additionalProperties = {
-                    "scale_precision": f"({c.numeric_precision or DEFAULT_NUMERIC_PRECISION},{c.numeric_scale})"
-                }
         else:
             result.type = nullable_column(c.column_name, "number", pks_for_table)
-            result.multipleOf = 10 ** (0 - numeric_scale)
-
         return result
 
     elif data_type == "date":
@@ -148,8 +141,7 @@ def schema_for_column(c, pks_for_table, use_singer_decimal):
 
     elif data_type in FLOAT_TYPES:
         if use_singer_decimal:  # Using custom `singer.decimal` string formatter, no opinion on scale/precision
-            result.type = result.type = nullable_column(c.column_name, "string", pks_for_table)
-            result.format = "singer.decimal"
+            result.type = nullable_column(c.column_name, "string", pks_for_table)
         else:
             result.type = nullable_column(c.column_name, "number", pks_for_table)
         return result
@@ -169,22 +161,18 @@ def schema_for_column(c, pks_for_table, use_singer_decimal):
     # "real"
     elif data_type == "float" and c.numeric_precision == 63:
         if use_singer_decimal:  # Using custom `singer.decimal` string formatter, no opinion on scale/precision
-            result.type = result.type = nullable_column(c.column_name, "string", pks_for_table)
-            result.format = "singer.decimal"
+            result.type = nullable_column(c.column_name, "string", pks_for_table)
         else:
             result.type = nullable_column(c.column_name, "number", pks_for_table)
-            result.multipleOf = 10**-18
         return result
 
     # "float", "double_precision",
     elif data_type in ["float", "double_precision"]:
 
         if use_singer_decimal:  # Using custom `singer.decimal` string formatter, no opinion on scale/precision
-            result.type = result.type = nullable_column(c.column_name, "string", pks_for_table)
-            result.format = "singer.decimal"
+            result.type = nullable_column(c.column_name, "string", pks_for_table)
         else:
             result.type = nullable_column(c.column_name, "number", pks_for_table)
-            result.multipleOf = 10**-38
         return result
 
     return Schema(None)

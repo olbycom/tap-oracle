@@ -92,11 +92,11 @@ def prepare_columns_sql(stream, c):
         sql_datatype = md_map.get(("properties", c), {}).get("sql-datatype")
 
         if sql_datatype == "DATE":
-            return 'to_char({}, \'YYYY-MM-DD"T"HH24:MI:SS"Z"\') AS {}'.format(column_name, column_name)
+            return "to_char({}, 'YYYY-MM-DD\"T\"HH24:MI:SS') || 'Z' AS {}".format(column_name, column_name)
         if sql_datatype and re.search(r"TIMESTAMP\([0-9]\) WITH (LOCAL )?TIME ZONE", sql_datatype):
             return "to_char({}, 'YYYY-MM-DD\"T\"HH24:MI:SS.FF TZH:TZM') AS {}".format(column_name, column_name)
         if sql_datatype and re.search(r"TIMESTAMP\([0-9]\)", sql_datatype):
-            return "to_char({}, 'YYYY-MM-DD\"T\"HH24:MI:SS.FF') AS {}".format(column_name, column_name)
+            return "to_char({}, 'YYYY-MM-DD\"T\"HH24:MI:SS.FF') || 'Z' AS {}".format(column_name, column_name)
 
     return column_name
 
@@ -105,10 +105,12 @@ def prepare_where_clause_arg(val, sql_datatype):
     if sql_datatype == "NUMBER":
         return val
     elif sql_datatype == "DATE":
-        return "to_date('{}')".format(val)
-    elif re.search("TIMESTAMP\([0-9]\) WITH (LOCAL )?TIME ZONE", sql_datatype):
-        return "to_timestamp_tz('{}')".format(val)
-    elif re.search("TIMESTAMP\([0-9]\)", sql_datatype):
-        return "to_timestamp('{}')".format(val)
+        dt_val = val.rstrip("Z")
+        return f"to_date('{dt_val}', 'YYYY-MM-DD\"T\"HH24:MI:SS')"
+    elif re.search(r"TIMESTAMP\([0-9]\) WITH (LOCAL )?TIME ZONE", sql_datatype):
+        return f"to_timestamp_tz('{val}', 'YYYY-MM-DD\"T\"HH24:MI:SS.FF TZH:TZM')"
+    elif re.search(r"TIMESTAMP\([0-9]\)", sql_datatype):
+        dt_val = val.rstrip("Z")
+        return f"to_timestamp('{dt_val}', 'YYYY-MM-DD\"T\"HH24:MI:SS.FF')"
     else:
         return "'{}'".format(val)

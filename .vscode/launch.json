@@ -1,0 +1,38 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "run",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/.venv/bin/tap-oracle",
+      "args": [
+        "--config",
+        "config.json",
+        "--catalog",
+        "catalog_test.json",
+        ">",
+        "output.jsonl"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "env": {
+        "PYTHONPATH": "${workspaceRoot}",
+        "DYLD_LIBRARY_PATH": "/Users/pedroceriotti/instantclient"
+      }
+    },
+    {
+      "name": "discover",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/.venv/bin/tap-oracle",
+      "args": ["--config", "config.json", "--discover", ">", "catalog.json"],
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "env": {
+        "PYTHONPATH": "${workspaceRoot}",
+        "DYLD_LIBRARY_PATH": "/Users/pedroceriotti/instantclient"
+      }
+    }
+  ]
+}
