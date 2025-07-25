@@ -74,7 +74,7 @@ def nullable_column(col_name, col_type, pks_for_table):
         return ["null", col_type]
 
 
-def schema_for_column(c, pks_for_table, use_singer_decimal):
+def schema_for_column(c, pks_for_table, use_singer_decimal, date_as_string=False):
     # Return Schema(None) to avoid calling lower() on a column with no datatype
     if c.data_type is None:
         LOGGER.info("Skipping column %s since it had no datatype", c.column_name)
@@ -102,13 +102,15 @@ def schema_for_column(c, pks_for_table, use_singer_decimal):
     # Exact match for DATE type
     elif data_type == "date":
         result.type = nullable_column(c.column_name, "string", pks_for_table)
-        result.format = "date-time"
+        if not date_as_string:
+            result.format = "date-time"
         return result
 
     # Regex for TIMESTAMP, TIMESTAMP WITH TIME ZONE, and TIMESTAMP WITH LOCAL TIME ZONE
     elif re.match(r"timestamp.*", data_type):
         result.type = nullable_column(c.column_name, "string", pks_for_table)
-        result.format = "date-time"
+        if not date_as_string:
+            result.format = "date-time"
         return result
 
     # Check for Oracle's XMLTYPE
@@ -304,7 +306,7 @@ def produce_column_metadata(
     return mdata
 
 
-def discover_columns(connection, table_info, filter_schemas, filter_tables, use_singer_decimal):
+def discover_columns(connection, table_info, filter_schemas, filter_tables, use_singer_decimal, date_as_string=False):
     cur = connection.cursor()
     binds_sql = [":{}".format(b) for b in range(len(filter_schemas))]
     filter = filter_sys_or_not(filter_schemas)
@@ -362,7 +364,9 @@ def discover_columns(connection, table_info, filter_schemas, filter_tables, use_
         (table_schema, table_name) = k
         pks_for_table = pk_constraints.get(table_schema, {}).get(table_name, [])
 
-        column_schemas = {c.column_name: schema_for_column(c, pks_for_table, use_singer_decimal) for c in cols}
+        column_schemas = {
+            c.column_name: schema_for_column(c, pks_for_table, use_singer_decimal, date_as_string) for c in cols
+        }
         schema = Schema(type="object", properties=column_schemas)
 
         md = produce_column_metadata(
@@ -386,7 +390,7 @@ def dump_catalog(catalog):
     catalog.dump()
 
 
-def do_discovery(conn_config, filter_schemas, filter_tables, use_singer_decimal):
+def do_discovery(conn_config, filter_schemas, filter_tables, use_singer_decimal, date_as_string=False):
     LOGGER.info("starting discovery")
 
     connection = orc_db.open_connection(conn_config)
@@ -448,7 +452,9 @@ def do_discovery(conn_config, filter_schemas, filter_tables, use_singer_decimal)
 
         table_info[schema][view_name] = {"is_view": True}
 
-    catalog = discover_columns(connection, table_info, filter_schemas, filter_tables, use_singer_decimal)
+    catalog = discover_columns(
+        connection, table_info, filter_schemas, filter_tables, use_singer_decimal, date_as_string
+    )
     dump_catalog(catalog)
     cur.close()
     connection.close()
@@ -700,6 +706,7 @@ def main_impl():
     full_table.USE_ORA_ROWSCN = bool(args.config.get("use_ora_rowscn", True))
     use_singer_decimal = bool(args.config.get("use_singer_decimal", False))
     incremental.OFFSET_VALUE = args.config.get("offset_value", 0)
+    date_as_string = bool(args.config.get("date_as_string", False))
 
     if args.discover:
         filter_schemas_prop = args.config.get("filter_schemas")
@@ -717,7 +724,7 @@ def main_impl():
             if filter_tables[0] == "*.*":
                 filter_tables = []
 
-        do_discovery(conn_config, filter_schemas, filter_tables, use_singer_decimal)
+        do_discovery(conn_config, filter_schemas, filter_tables, use_singer_decimal, date_as_string)
 
     elif args.catalog:
         state = args.state
