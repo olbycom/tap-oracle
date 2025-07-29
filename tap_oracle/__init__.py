@@ -367,6 +367,17 @@ def discover_columns(connection, table_info, filter_schemas, filter_tables, use_
         column_schemas = {
             c.column_name: schema_for_column(c, pks_for_table, use_singer_decimal, date_as_string) for c in cols
         }
+
+        internal_logger.info(f"--- DIAGNOSTIC: Schema Comparison for {table_schema}.{table_name} ---")
+        for c in cols:
+            inferred_schema = column_schemas.get(c.column_name)
+            internal_logger.info(
+                f"Column: {c.column_name}, "
+                f"Oracle DB Type: {c.data_type}, "
+                f"Inferred Singer Schema: {inferred_schema.to_dict() if inferred_schema else 'None'}"
+            )
+        internal_logger.info("--- END DIAGNOSTIC ---")
+
         schema = Schema(type="object", properties=column_schemas)
 
         md = produce_column_metadata(
