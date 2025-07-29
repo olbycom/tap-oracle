@@ -86,11 +86,16 @@ def OutputTypeHandler(cursor, name, defaultType, size, precision, scale):
 def prepare_columns_sql(stream, c):
     column_name = '"{}"'.format(c)
     prop = stream.schema.properties[c]
+    md_map = metadata.to_map(stream.metadata)
+    sql_datatype = md_map.get(("properties", c), {}).get("sql-datatype", "").upper()
+
+    # If the user has opted to receive raw date/timestamp values as strings,
+    # we should cast them to VARCHAR2 to avoid any conflicts with Oracle's
+    # session-level NLS format settings.
+    if (sql_datatype == "DATE" or sql_datatype.startswith("TIMESTAMP")) and prop.format != "date-time":
+        return f"CAST({column_name} AS VARCHAR2(255)) AS {column_name}"
 
     if "string" in prop.type and prop.format == "date-time":
-        md_map = metadata.to_map(stream.metadata)
-        sql_datatype = md_map.get(("properties", c), {}).get("sql-datatype")
-
         if sql_datatype == "DATE":
             return "to_char({}, 'YYYY-MM-DD') AS {}".format(column_name, column_name)
         if sql_datatype and re.search(r"TIMESTAMP\([0-9]\) WITH (LOCAL )?TIME ZONE", sql_datatype):
