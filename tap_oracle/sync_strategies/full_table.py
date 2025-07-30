@@ -24,16 +24,17 @@ BATCH_SIZE = 1000
 USE_ORA_ROWSCN = True
 
 
-def sync_view(conn_config, stream, state, desired_columns):
+def sync_view(conn_config, stream, state, desired_columns, date_as_string=False):
     connection = orc_db.open_connection(conn_config)
     connection.outputtypehandler = common.OutputTypeHandler
 
     cur = connection.cursor()
     cur.arraysize = BATCH_SIZE
-    cur.execute("ALTER SESSION SET TIME_ZONE = '00:00'")
-    cur.execute("""ALTER SESSION SET NLS_DATE_FORMAT = 'YYYY-MM-DD"T"HH24:MI:SS."00+00:00"'""")
-    cur.execute("""ALTER SESSION SET NLS_TIMESTAMP_FORMAT='YYYY-MM-DD"T"HH24:MI:SSXFF"+00:00"'""")
-    cur.execute("""ALTER SESSION SET NLS_TIMESTAMP_TZ_FORMAT  = 'YYYY-MM-DD"T"HH24:MI:SS.FFTZH:TZM'""")
+    if not date_as_string:
+        cur.execute("ALTER SESSION SET TIME_ZONE = '00:00'")
+        cur.execute("""ALTER SESSION SET NLS_DATE_FORMAT = 'YYYY-MM-DD"T"HH24:MI:SS."00+00:00"'""")
+        cur.execute("""ALTER SESSION SET NLS_TIMESTAMP_FORMAT='YYYY-MM-DD"T"HH24:MI:SSXFF"+00:00"'""")
+        cur.execute("""ALTER SESSION SET NLS_TIMESTAMP_TZ_FORMAT  = 'YYYY-MM-DD"T"HH24:MI:SS.FFTZH:TZM'""")
     time_extracted = utils.now()
 
     # before writing the table version to state, check if we had one to begin with
@@ -85,16 +86,17 @@ def sync_view(conn_config, stream, state, desired_columns):
     return state
 
 
-def sync_table(conn_config, stream, state, desired_columns):
+def sync_table(conn_config, stream, state, desired_columns, date_as_string=False):
     connection = orc_db.open_connection(conn_config)
     connection.outputtypehandler = common.OutputTypeHandler
 
     cur = connection.cursor()
     cur.arraysize = BATCH_SIZE
-    cur.execute("ALTER SESSION SET TIME_ZONE = '00:00'")
-    cur.execute("""ALTER SESSION SET NLS_DATE_FORMAT = 'YYYY-MM-DD"T"HH24:MI:SS."00+00:00"'""")
-    cur.execute("""ALTER SESSION SET NLS_TIMESTAMP_FORMAT='YYYY-MM-DD"T"HH24:MI:SSXFF"+00:00"'""")
-    cur.execute("""ALTER SESSION SET NLS_TIMESTAMP_TZ_FORMAT  = 'YYYY-MM-DD"T"HH24:MI:SS.FFTZH:TZM'""")
+    if not date_as_string:
+        cur.execute("ALTER SESSION SET TIME_ZONE = '00:00'")
+        cur.execute("""ALTER SESSION SET NLS_DATE_FORMAT = 'YYYY-MM-DD"T"HH24:MI:SS."00+00:00"'""")
+        cur.execute("""ALTER SESSION SET NLS_TIMESTAMP_FORMAT='YYYY-MM-DD"T"HH24:MI:SSXFF"+00:00"'""")
+        cur.execute("""ALTER SESSION SET NLS_TIMESTAMP_TZ_FORMAT  = 'YYYY-MM-DD"T"HH24:MI:SS.FFTZH:TZM'""")
     time_extracted = utils.now()
 
     # before writing the table version to state, check if we had one to begin with
