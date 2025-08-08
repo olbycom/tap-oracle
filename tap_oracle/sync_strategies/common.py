@@ -106,11 +106,11 @@ def prepare_columns_sql(stream, c):
     return column_name
 
 
-def prepare_where_clause_arg(val, sql_datatype):
+def prepare_where_clause_arg(val, sql_datatype, date_format="YYYY-MM-DD"):
     if sql_datatype == "NUMBER":
         return val
     elif sql_datatype == "DATE":
-        return f"to_date('{val}', 'YYYY-MM-DD')"
+        return f"to_date('{val}', '{date_format}')"
     elif re.search(r"TIMESTAMP\([0-9]\) WITH (LOCAL )?TIME ZONE", sql_datatype):
         return f"to_timestamp_tz('{val}', 'YYYY-MM-DD\"T\"HH24:MI:SS.FF TZH:TZM')"
     elif re.search(r"TIMESTAMP\([0-9]\)", sql_datatype):

@@ -24,7 +24,7 @@ OFFSET_VALUE = 0
 BATCH_SIZE = 1000
 
 
-def sync_table(conn_config, stream, state, desired_columns, date_as_string=False):
+def sync_table(conn_config, stream, state, desired_columns, date_as_string=False, date_format="YYYY-MM-DD"):
     connection = orc_db.open_connection(conn_config)
     connection.outputtypehandler = common.OutputTypeHandler
 
@@ -76,7 +76,7 @@ def sync_table(conn_config, stream, state, desired_columns, date_as_string=False
                 f"Resuming Incremental replication from {replication_key} = {replication_key_value} + {typed_offset_value}"
             )
             casted_where_clause_arg = common.prepare_where_clause_arg(
-                replication_key_value, replication_key_sql_datatype
+                replication_key_value, replication_key_sql_datatype, date_format
             )
 
             select_sql = f"""SELECT {','.join(escaped_columns)}

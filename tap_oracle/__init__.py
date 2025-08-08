@@ -478,7 +478,7 @@ def is_selected_via_metadata(stream):
 
 
 # Possible state keys: replication_key, replication_key_value, version
-def do_sync_incremental(conn_config, stream, state, desired_columns, date_as_string=False):
+def do_sync_incremental(conn_config, stream, state, desired_columns, date_as_string=False, date_format="YYYY-MM-DD"):
     md_map = metadata.to_map(stream.metadata)
     replication_key = md_map.get((), {}).get("replication-key")
     if not replication_key:
@@ -498,7 +498,7 @@ def do_sync_incremental(conn_config, stream, state, desired_columns, date_as_str
     state = singer.write_bookmark(state, stream.tap_stream_id, "replication_key", replication_key)
 
     common.send_schema_message(stream, [replication_key])
-    state = incremental.sync_table(conn_config, stream, state, desired_columns, date_as_string)
+    state = incremental.sync_table(conn_config, stream, state, desired_columns, date_as_string, date_format)
 
     return state
 
@@ -592,7 +592,7 @@ def sync_log_miner_streams(conn_config, log_miner_streams, state, end_scn, date_
     return state
 
 
-def sync_traditional_stream(conn_config, stream, state, sync_method, end_scn, date_as_string=False):
+def sync_traditional_stream(conn_config, stream, state, sync_method, end_scn, date_as_string=False, date_format="YYYY-MM-DD"):
     LOGGER.info("Beginning sync of stream(%s) with sync method(%s)", stream.tap_stream_id, sync_method)
     md_map = metadata.to_map(stream.metadata)
     desired_columns = [c for c in stream.schema.properties.keys() if common.should_sync_column(md_map, c)]
@@ -625,7 +625,7 @@ def sync_traditional_stream(conn_config, stream, state, sync_method, end_scn, da
         state = full_table.sync_table(conn_config, stream, state, desired_columns)
     elif sync_method == "incremental":
         state = singer.set_currently_syncing(state, stream.tap_stream_id)
-        state = do_sync_incremental(conn_config, stream, state, desired_columns, date_as_string)
+        state = do_sync_incremental(conn_config, stream, state, desired_columns, date_as_string, date_format)
 
     else:
         raise Exception("unknown sync method {} for stream {}".format(sync_method, stream.tap_stream_id))
@@ -645,7 +645,7 @@ def any_logical_streams(streams, default_replication_method):
     return False
 
 
-def do_sync(conn_config, catalog, default_replication_method, state, date_as_string=False):
+def do_sync(conn_config, catalog, default_replication_method, state, date_as_string=False, date_format="YYYY-MM-DD"):
     currently_syncing = singer.get_currently_syncing(state)
     streams = list(filter(is_selected_via_metadata, catalog.streams))
     streams.sort(key=lambda s: s.tap_stream_id)
@@ -679,7 +679,7 @@ def do_sync(conn_config, catalog, default_replication_method, state, date_as_str
 
     for stream in traditional_streams:
         state = sync_traditional_stream(
-            conn_config, stream, state, sync_method_lookup[stream.tap_stream_id], end_scn, date_as_string
+            conn_config, stream, state, sync_method_lookup[stream.tap_stream_id], end_scn, date_as_string, date_format
         )
 
     state = sync_log_miner_streams(conn_config, list(logical_streams), state, end_scn, date_as_string)
@@ -720,6 +720,7 @@ def main_impl():
     use_singer_decimal = bool(args.config.get("use_singer_decimal", False))
     incremental.OFFSET_VALUE = args.config.get("offset_value", 0)
     date_as_string = bool(args.config.get("date_as_string", False))
+    date_format = args.config.get("date_format", "YYYY-MM-DD")
 
     if args.discover:
         filter_schemas_prop = args.config.get("filter_schemas")
@@ -741,7 +742,7 @@ def main_impl():
 
     elif args.catalog:
         state = args.state
-        do_sync(conn_config, args.catalog, args.config.get("default_replication_method"), state, date_as_string)
+        do_sync(conn_config, args.catalog, args.config.get("default_replication_method"), state, date_as_string, date_format)
     else:
         LOGGER.info("No properties were selected")
 
