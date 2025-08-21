@@ -1,38 +1,66 @@
 {
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "run",
+      "name": "Run",
       "type": "debugpy",
       "request": "launch",
-      "program": "${workspaceFolder}/.venv/bin/tap-oracle",
+      "cwd": "${workspaceFolder}",
+      "program": "tap_oracle",
+      "justMyCode": false,
       "args": [
         "--config",
-        "config.json",
+        ".secrets/config.json",
         "--catalog",
-        "catalog_test.json",
-        ">",
-        "output.jsonl"
+        ".secrets/catalog.json",
+        "--state",
+        ".secrets/state.json",
       ],
-      "console": "integratedTerminal",
-      "justMyCode": false,
       "env": {
-        "PYTHONPATH": "${workspaceRoot}",
-        "DYLD_LIBRARY_PATH": "/Users/pedroceriotti/instantclient"
+        "DYLD_LIBRARY_PATH": "/opt/homebrew/lib"
       }
     },
     {
-      "name": "discover",
+      "name": "Run (Save)",
       "type": "debugpy",
       "request": "launch",
-      "program": "${workspaceFolder}/.venv/bin/tap-oracle",
-      "args": ["--config", "config.json", "--discover", ">", "catalog.json"],
-      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "program": "tap_oracle",
       "justMyCode": false,
+      "args": [
+        "--config",
+        ".secrets/config.json",
+        "--catalog",
+        ".secrets/catalog.json",
+        "--state",
+        ".secrets/state.json",
+        ">",
+        "output/data.jsonl",
+      ],
       "env": {
-        "PYTHONPATH": "${workspaceRoot}",
-        "DYLD_LIBRARY_PATH": "/Users/pedroceriotti/instantclient"
+        "DYLD_LIBRARY_PATH": "/opt/homebrew/lib"
       }
-    }
+    },
+    {
+      "name": "Discover",
+      "type": "debugpy",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "program": "tap_oracle",
+      "justMyCode": false,
+      "args": [
+        "--config",
+        ".secrets/config.json",
+        "--discover",
+        ">",
+        "output/catalog.json",
+      ],
+      "env": {
+        "DYLD_LIBRARY_PATH": "/opt/homebrew/lib"
+      }
+    },
   ]
 }

@@ -1,266 +1,136 @@
-# pipelinewise-tap-oracle
-![singer_oracle_tap](https://user-images.githubusercontent.com/84364906/220866178-96d0c47f-b53d-4125-9075-576e3a0cf08b.png)
+# tap-oracle
 
-[![PyPI version](https://badge.fury.io/py/pipelinewise-tap-oracle.svg)](https://badge.fury.io/py/pipelinewise-tap-oracle)
-[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/pipelinewise-tap-oracle.svg)](https://pypi.org/project/pipelinewise-tap-oracle/)
-[![License: MIT](https://img.shields.io/badge/License-GPLv3-yellow.svg)](https://opensource.org/licenses/GPL-3.0)
+`tap-oracle` is a Singer tap for Oracle.
 
+Built with the [Meltano Tap SDK](https://sdk.meltano.com) for Singer Taps.
 
-[Singer](https://www.singer.io/) tap that extracts data from a [Oracle](https://www.oracle.com/database/) database and produces JSON-formatted data following the [Singer spec](https://github.com/singer-io/getting-started/blob/master/docs/SPEC.md).
+<!--
 
-This is a [PipelineWise](https://transferwise.github.io/pipelinewise) compatible tap connector.
+Developer TODO: Update the below as needed to correctly describe the install procedure. For instance, if you do not have a PyPI repo, or if you want users to directly install from your git repo, you can modify this step as appropriate.
 
-## How to use it
+## Installation
 
-The recommended method of running this tap is to use it from [PipelineWise](https://transferwise.github.io/pipelinewise). When running it from PipelineWise you don't need to configure this tap with JSON files and most of things are automated. Please check the related documentation at [Tap Oracle](https://transferwise.github.io/pipelinewise/connectors/taps/oracle.html)
-
-If you want to run this [Singer Tap](https://singer.io) independently please read further.
-
-## Log based replication
-
-Tap-Oracle Log-based replication requires some configuration changes in Oracle database:
-
-* Enable `ARCHIVELOG` mode
-
-* Set retention period a reasonable and long enough period, ie. 1 day, 3 days, etc.
-
-* Enable Supplemental logging
-
-### Setting up Log-based replication on a self hosted Oracle Database: 
-
-To verify the current archiving mode, if the result is `ARCHIVELOG`, archiving is enabled:
-```
-  SQL> SELECT LOG_MODE FROM V$DATABASE
-```
-
-To enable `ARCHIVELOG` mode (if not enabled yet):
-```
-  SQL> SHUTDOWN IMMEDIATE
-  SQL> STARTUP MOUNT
-  SQL> ALTER DATABASE ARCHIVELOG
-  SQL> ALTER DATABASE OPEN
-```
-
-To set retention period, use RMAN:
-```
-  RMAN> CONFIGURE RETENTION POLICY TO RECOVERY WINDOW OF 1 DAYS;
-```
-
-To enable supplemental logging:
-```
-  SQL> ALTER DATABASE ADD SUPPLEMENTAL LOG DATA (ALL) COLUMNS
-```
-
-### Setting up Log-based replication on Oracle on Amazon RDS
-
-To set retention period:
-```
-  begin
-      rdsadmin.rdsadmin_util.set_configuration(
-          name  => 'archivelog retention hours',
-          value => '24');
-  end;
-```
-
-To enable supplemental logging:
-```
-  begin
-    rdsadmin.rdsadmin_util.alter_supplemental_logging(p_action => 'ADD');
-  end;
-```
-
-### Install and Run
-
-First, make sure Python 3 is installed on your system or follow these
-installation instructions for [Mac](http://docs.python-guide.org/en/latest/starting/install3/osx/) or
-[Ubuntu](https://www.digitalocean.com/community/tutorials/how-to-install-python-3-and-set-up-a-local-programming-environment-on-ubuntu-16-04).
-
-
-It's recommended to use a virtualenv:
+Install from PyPI:
 
 ```bash
-  python3 -m venv venv
-  pip install pipelinewise-tap-oracle
+uv tool install tap-oracle
 ```
 
-or
+Install from GitHub:
 
 ```bash
-  python3 -m venv venv
-  . venv/bin/activate
-  pip install --upgrade pip
-  pip install .
+uv tool install git+https://github.com/ORG_NAME/tap-oracle.git@main
 ```
 
-### OS Setup
+-->
 
-Before you can use tap-oracle, you need to download and install Oracle Client software. This means downloading appropriate Oracle Client software, and configuring environment variables to point the Oracle Client software as per Oracle's software setup.
+## Configuration
 
-The following script is an Example for running this tap in a Docker Container and it a snippet of code from a `Dockerfile`. An equivalent setup can be done as a one-off in a Linux Server by way of example with appropriate environment variables set in a .bash_profile or appropriate shell for your environment.
+### Accepted Config Options
 
-Note: The legacy cx_Oracle library is not available on MacOS. The setup.py will ignore installing the library for a MacOS, the ora_python_driver_type becomes mandatory with a value of thin for the client mode.
+<!--
+Developer TODO: Provide a list of config options accepted by the tap.
 
-```shell
-# For more details on the Oracle CX_Oracle library refer to 
-# https://cx-oracle.readthedocs.io/en/latest/
-# For more details on the Oracle oracledb library ref to
-# https://oracle.github.io/python-oracledb/
-# Install the libaio1 library for the Oracle Client, unzip
-RUN apt-get update \
-    && apt-get install -y unzip libaio1 \
-    && apt-get clean \
-    && find /var/cache/apt/archives /var/lib/apt/lists -not -name lock -type f -delete
+This section can be created by copy-pasting the CLI output from:
 
-# Install the Oracle Client
-RUN mkdir /opt/oracle \
-    && cd ~ \
-    && curl -O https://download.oracle.com/otn_software/linux/instantclient/1912000/instantclient-basic-linux.x64-19.12.0.0.0dbru.zip \
-    && unzip instantclient-basic-linux.x64-19.12.0.0.0dbru.zip -d /opt/oracle \
-    && rm instantclient-basic-linux.x64-19.12.0.0.0dbru.zip
-
-# Set required Oracle Client environment variables
-ENV ORACLE_HOME="/opt/oracle/instantclient_19_12"
-ENV PATH="$PATH:$ORACLE_HOME" \
-    LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$ORACLE_HOME" \
-    TNS_ADMIN="$ORACLE_HOME/network/admin"
 ```
-### Configuration
+tap-oracle --about --format=markdown
+```
+-->
 
-Running the the tap requires a `config.json` file. Example with the minimal settings:
+A full list of supported settings and capabilities for this
+tap is available by running:
 
-```json
-  {
-    "host": "foo.com",
-    "port": 1521,
-    "user": "my_user",
-    "password": "password",
-    "service_name": "ORCL"
-  }
+```bash
+tap-oracle --about
 ```
 
-Recommended optional settings
+### Configure using environment variables
 
-* `"filter_schemas": "schema name"`   - This will speed up discover time as it only discovers the given schema.
-* `"filter_tables": ["SCHEMA-TABLE1", "SCHEMA-TABLE1"]` - this will speed up discovery to just the listed tables.
-* `"use_singer_decimal": true`        - This will help avoid numeric rounding issues emitting as a string with a format of singer.decimal.
-* `"cursor_array_size": 10000` - This will help speed up extracts over a WAN or low latency network. The default is 1000.
-* `"ora_python_driver_type": "cx|thick|thin"` - Provides an option to specify a Oracle driver library to use. The default is cx.
+This Singer tap will automatically import any environment variables within the working directory's
+`.env` if the `--config=ENV` is provided, such that config values will be considered if a matching
+environment variable is set either in the terminal context or in the `.env` file.
 
-Optional:
+### Source Authentication and Authorization
 
-For older database or connecting to an instance you can use the legacy SID for the connection.
-Swap the `sid` keyword for `service_name`.
+<!--
+Developer TODO: If your tap requires special access on the source system, or any special authentication requirements, provide those here.
+-->
 
-```json
-  {
-    "sid": "ORCL"
-  }
+## Usage
+
+You can easily run `tap-oracle` by itself or in a pipeline using [Meltano](https://meltano.com/).
+
+### Executing the Tap Directly
+
+```bash
+tap-oracle --version
+tap-oracle --help
+tap-oracle --config CONFIG --discover > ./catalog.json
 ```
 
-Optional:
+## Developer Resources
 
-To filter the discovery to a particular schema within a database. This is useful if you have a large number of schemas and wish to speed up the discovery.
+Follow these instructions to contribute to this project.
 
-```json
-{
-  "filter_schemas": "your database schema name",
-}
+### Initialize your Development Environment
+
+Prerequisites:
+
+- Python 3.9+
+- [uv](https://docs.astral.sh/uv/)
+
+```bash
+uv sync
 ```
 
-Optional:
+### Create and Run Tests
 
-To filter the discovery to a particular list of tables in a database. This is useful if you have a large number of tables in a schema and wish to speed up the discovery.
-Note: There is a format feature each table of ["SCHEMA-TABLE"] and should follow JSON arry literal formatting.
-You can also filter tables by setting an environment variable `MELTANO_EXTRACT__SELECT`. e.g. export MELTANO_EXTRACT__SELECT='["HR-EMPLOYEES", "HR-DEPARTMENTS"]'
+Create tests within the `tests` subfolder and
+then run:
 
-```json
-{
-  "filter_tables": ["HR-EMPLOYEES", "HR-DEPARTMENTS"],
-}
+```bash
+uv run pytest
 ```
 
-Optional:
+You can also test the `tap-oracle` CLI interface directly using `uv run`:
 
-Support for a common user for working with pluggable databases (PDB). Every common user can connect to an perform operations within the root database, and within any PDB in which it has privileges.
-
-```json
-{
-  "common_user": "common_user_defined_in_oracle",
-  "common_password": "common_user_password",
-  "common_service_name": "common_user_service_connection_name",
-}
+```bash
+uv run tap-oracle --help
 ```
 
-Optional:
+### Testing with [Meltano](https://www.meltano.com)
 
-A boolean setting: when enabled `true`, it outputs decimal and floating point numbers as strings to avoid loss of precision and scale.
-There are hints in the schema message, format = "singer.decimal", and additionalProperties scale_precision dictionary providing precision and scale. For decimal data, the target can use this 
-information to correctly replicate decimal data without loss. For the Floats and Number data type without precision and scale it is recommended that post processing formats the datatype based on an inspection of the data because the true data size is unknown / dynamic.
+_**Note:** This tap will work in any Singer environment and does not require Meltano.
+Examples here are for convenience and to streamline end-to-end orchestration scenarios._
 
-```json
-{
-  "use_singer_decimal": true,
-}
+<!--
+Developer TODO:
+Your project comes with a custom `meltano.yml` project file already created. Open the `meltano.yml` and follow any "TODO" items listed in
+the file.
+-->
+
+Next, install Meltano (if you haven't already) and any needed plugins:
+
+```bash
+# Install meltano
+uv tool install meltano
+# Initialize meltano within this directory
+cd tap-oracle
+meltano install
 ```
 
-Optional:
+Now you can test and orchestrate using Meltano:
 
-To avoid problems with uncommitted changes being read, you can set `offset_value` to add to the value found in the STATE for INCREMENTAL loads. If the value provided is for a datetime replication key then the `offset_value` is read as seconds to offset by, otherwise the value is used as provided.
+```bash
+# Test invocation:
+meltano invoke tap-oracle --version
 
-Using offset_value < 0 would result in an overlapping set of records being read each time the tap is run.
-
-Using offset_value > 0 may result in data being missed. However it can be useful if a period (month-year) is being used. This prevents the tap from using period >= last-read-period and doubling up on the extract.
-
-Usage (offsetting by +1 day in seconds = 24*3600):
-```json
-{
-  "offset_value": 86400
-}
+# OR run a test ELT pipeline:
+meltano run tap-oracle target-jsonl
 ```
 
-Optional:
+### SDK Dev Guide
 
-A numeric setting adjusting the internal buffersize. The common query tuning scenario is for SELECT statements that return a large number of rows over a slow network. Increasing arraysize can improve performance by reducing the number of round-trips to the database. However increasing this value increases the amount of memory required.
-
-```json
-{
-  "cursor_array_size": 10000,
-}
-```
-
-Optional:
-
-A setting which will dynamically import the correct Oracle Library and set the connection mode. This allows you to select the legacy 'cx' Oracle driver library or the newer 'oracledb' library. With the newer 'oracledb' library you can run it in either 'thick' or 'thin' mode. Under thin mode you can pass specific driver settings like 'https_proxy' if and as required via config settings.
-
-```json
-{
-  "ora_python_driver_type": "thin",
-}
-```
-
-### To run tests:
-
-Tests require Oracle on Amazon RDS >= 12.1, and a user called `ROOT`.
-
-1. Define environment variables that requires running the tests.
-```
-  export TAP_ORACLE_HOST=<oracle-rds-host>
-  export TAP_ORACLE_PORT=<oracle-rds-port>
-  export TAP_ORACLE_USER=ROOT
-  export TAP_ORACLE_PASSWORD=<oracle-rds-password>
-  export TAP_ORACLE_SID=<oracle-rds-sid>
-```
-
-1. Install python dependencies in a virtual env and run nose unit and integration tests
-```
-  python3 -m venv venv
-  . venv/bin/activate
-  pip install --upgrade pip
-  pip install .
-  pip install nose
-```
-
-3. To run unit tests:
-```
-  nosetests
-```
+See the [dev guide](https://sdk.meltano.com/en/latest/dev_guide.html) for more instructions on how to use the SDK to
+develop your own taps and targets.

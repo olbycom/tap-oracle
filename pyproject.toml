@@ -1,0 +1,83 @@
+[project]
+name = "tap-oracle"
+version = "0.0.1"
+description = "Singer tap for Snowflake, built with the Meltano Singer SDK."
+readme = "README.md"
+authors = [{ name = "Vinicius Justo", email = "vinicius@nekt.com" }]
+keywords = [
+    "ELT",
+    "Oracle",
+]
+classifiers = [
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+license-files = [ "LICENSE" ]
+requires-python = ">=3.11"
+dependencies = [
+    "nekt-singer-sdk @ git+https://github.com/nektcom/singer-sdk.git@v0.2.9",
+    "paramiko>=4.0.0",
+    "sshtunnel>=0.4.0",
+    "sqlalchemy (>=2.0.43,<3.0.0)",
+    "oracledb (>=3.3.0,<4.0.0)",
+    "pendulum>=3.1.0",
+]
+
+[project.optional-dependencies]
+s3 = [
+    "fs-s3fs~=1.1.1",
+]
+
+[project.scripts]
+# CLI declaration
+tap-oracle = 'tap_oracle.tap:TapOracle.cli'
+
+[dependency-groups]
+dev = [
+    { include-group = "test" },
+]
+test = [
+    "pytest>=8",
+    "singer-sdk[testing]",
+]
+[tool.hatch.build.targets.wheel]
+packages = [
+    "tap_oracle",
+]
+
+[tool.pytest.ini_options]
+addopts = [
+    "--durations=10",
+]
+
+[tool.mypy]
+warn_unused_configs = true
+
+[tool.ruff]
+line-length = 160
+
+[tool.ruff.lint]
+ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = [
+    "D104",  # Missing docstring in public package
+    "F401",  # Imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+]
+"**/tests/**/*.py" = [
+    "S101",  # Use of assert detected
+]
+
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[build-system]
+requires = [
+    "hatchling>=1,<2",
+]
+build-backend = "hatchling.build"
