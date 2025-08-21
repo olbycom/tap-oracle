@@ -14,6 +14,7 @@ from nekt_singer_sdk import SQLConnector
 from nekt_singer_sdk import typing as th
 from nekt_singer_sdk.custom_logger import internal_logger
 from nekt_singer_sdk.singerlib import CatalogEntry, MetadataMapping, Schema
+from sqlalchemy.engine.url import make_url
 from sqlalchemy.pool import QueuePool
 
 try:
@@ -534,43 +535,112 @@ class OracleConnector(SQLConnector):
 
         return timestamp_value
 
+    def create_raw_oracle_connection(self):
+        """Create a raw Oracle connection for LogMiner operations.
+
+        This method creates a direct Oracle connection using oracledb,
+        bypassing SQLAlchemy for operations that require raw Oracle functionality.
+        """
+        if not oracledb:
+            raise ImportError("oracledb is required for raw Oracle connections")
+
+        # Ensure Oracle thick mode is initialized if requested
+        if self.config.get("thick_mode", True):
+            self._ensure_oracle_thick_mode()
+
+        # Parse the existing SQLAlchemy URL to get connection parameters
+        url_obj = make_url(self.sqlalchemy_url)
+
+        # Log connection parameters for debugging (without password)
+        internal_logger.debug(
+            "Creating raw Oracle connection with: host=%s, port=%s, user=%s, database=%s", url_obj.host, url_obj.port, url_obj.username, url_obj.database
+        )
+
+        # Build Oracle connection string
+        if url_obj.password:
+            connection_string = f"{url_obj.username}/{url_obj.password}@{url_obj.host}:{url_obj.port}/{url_obj.database}"
+        else:
+            # Handle case where password might be in config
+            password = self.config.get("password", "")
+            connection_string = f"{url_obj.username}/{password}@{url_obj.host}:{url_obj.port}/{url_obj.database}"
+
+        internal_logger.debug("Oracle connection string: %s", connection_string.replace(url_obj.password or password, "***"))
+
+        # Create raw Oracle connection
+        try:
+            connection = oracledb.connect(connection_string)
+            internal_logger.info("Successfully created raw Oracle connection for LogMiner")
+        except Exception as e:
+            internal_logger.error("Failed to create Oracle connection: %s", e)
+            internal_logger.error("Connection string: %s", connection_string.replace(url_obj.password or password, "***"))
+            raise
+
+        # Set session parameters for LogMiner compatibility
+        cursor = connection.cursor()
+        try:
+            cursor.execute("ALTER SESSION SET TIME_ZONE = '00:00'")
+            cursor.execute("""ALTER SESSION SET NLS_DATE_FORMAT = 'YYYY-MM-DD"T"HH24:MI:SS."00+00:00"'""")
+            cursor.execute("""ALTER SESSION SET NLS_TIMESTAMP_FORMAT='YYYY-MM-DD"T"HH24:MI:SSXFF"+00:00"'""")
+            cursor.execute("""ALTER SESSION SET NLS_TIMESTAMP_TZ_FORMAT  = 'YYYY-MM-DD"T"HH24:MI:SS.FFTZH:TZM'""")
+            internal_logger.debug("Set LogMiner-compatible session parameters")
+        except Exception as e:
+            internal_logger.warning("Failed to set some session parameters: %s", e)
+        finally:
+            cursor.close()
+
+        return connection
+
+    def _ensure_oracle_thick_mode(self):
+        """Ensure Oracle thick mode is initialized before creating connections.
+
+        This method must be called before any Oracle connections are made
+        to ensure consistent thick mode usage throughout the process.
+        """
+        if not oracledb:
+            return
+
+        try:
+            # Check if thick mode is already initialized
+            if hasattr(oracledb, "_thick_mode_initialized"):
+                return
+
+            # Initialize Oracle thick mode
+            lib_dir = self._get_oracle_lib_dir()
+            if lib_dir:
+                oracledb.init_oracle_client(lib_dir=lib_dir)
+                internal_logger.info("Oracle thick mode initialized with lib_dir: %s", lib_dir)
+            else:
+                # Try to initialize without specifying lib_dir (let oracledb find it)
+                oracledb.init_oracle_client()
+                internal_logger.info("Oracle thick mode initialized (auto-detected lib_dir)")
+
+            # Mark as initialized to prevent duplicate calls
+            oracledb._thick_mode_initialized = True
+
+        except Exception as e:
+            internal_logger.warning("Failed to initialize Oracle thick mode: %s", e)
+            # Don't raise - allow thin mode to be used as fallback
+
+    def _get_oracle_lib_dir(self) -> str | None:
+        """Get Oracle library directory from environment variables."""
+        # Check common environment variables for Oracle libraries
+        for env_var in ["LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"]:
+            lib_paths = os.environ.get(env_var, "").split(":")
+            for lib_path in lib_paths:
+                if lib_path:
+                    # Look for Oracle client library
+                    for lib_name in ["libclntsh.so", "libclntsh.dylib"]:
+                        lib_file = os.path.join(lib_path, lib_name)
+                        if os.path.exists(lib_file):
+                            return lib_path
+        return None
+
     def create_engine(self) -> Engine:
         """Create Oracle database engine with appropriate connection parameters."""
 
         # Initialize Oracle thick mode if requested and oracledb is available
-        if oracledb and self.config.get("thick_mode", True):
-            try:
-                # Try to get library directory from environment variables
-                lib_dir = None
-
-                # Check LD_LIBRARY_PATH (Linux/Unix) and DYLD_LIBRARY_PATH (macOS)
-                for env_var in ["LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"]:
-                    lib_path = os.environ.get(env_var)
-                    if lib_path:
-                        # Use the first directory that contains libclntsh
-                        for path in lib_path.split(":"):
-                            if path and os.path.isdir(path):
-                                # Check for Oracle client library files
-                                for lib_file in ["libclntsh.so", "libclntsh.dylib"]:
-                                    if os.path.exists(os.path.join(path, lib_file)):
-                                        lib_dir = path
-                                        break
-                                if lib_dir:
-                                    break
-                        if lib_dir:
-                            break
-
-                # Try with discovered library directory
-                if lib_dir:
-                    oracledb.init_oracle_client(lib_dir=lib_dir)
-                    internal_logger.info(f"Oracle thick mode initialized successfully with lib_dir: {lib_dir}")
-                else:
-                    # Fallback: try without explicit lib_dir (use system path)
-                    oracledb.init_oracle_client()
-                    internal_logger.info("Oracle thick mode initialized successfully (using system path).")
-            except Exception as e:
-                internal_logger.warning(f"Failed to initialize Oracle thick mode: {e}")
-                internal_logger.info("Continuing with thin mode...")
+        if self.config.get("thick_mode", True) and oracledb:
+            self._ensure_oracle_thick_mode()
 
         try:
             # Create engine without thick_mode parameter (handled by init_oracle_client)
