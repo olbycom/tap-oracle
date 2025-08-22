@@ -221,7 +221,7 @@ class OracleSingleLogBasedStream(SQLStream):
         if start_scn >= current_scn:
             user_logger.info("No new changes to process (start_scn >= current_scn)")
             return
-            
+
         # Find the actual available SCN range from logs
         connection = self.connector.create_raw_oracle_connection()
         try:
@@ -229,57 +229,56 @@ class OracleSingleLogBasedStream(SQLStream):
             if available_start is None:
                 user_logger.warning("No archived logs available for processing. This may be normal for a new database.")
                 return
-                
+
             user_logger.info("Available SCN range in logs: %s-%s", available_start, available_end)
-            
+
             # Adjust our range to what's actually available
             start_scn = max(start_scn, available_start)
             current_scn = min(current_scn, available_end)
-            
+
             if start_scn >= current_scn:
                 user_logger.info("No logs available for our SCN range")
                 return
-                
+
         finally:
             connection.close()
 
         # Process LogMiner data in batches for better performance and resource management
         # This follows Oracle LogMiner best practices
         batch_size = self.config.get("logminer_batch_size", 10000)  # Default 10000 SCNs per batch
-        
+
         user_logger.info("Processing LogMiner in batches of %d SCNs until current SCN %s", batch_size, current_scn)
-        
+
         batch_start = start_scn
         batch_count = 0
-        
+
         # Process all batches until we reach the current SCN
         # Never stop early - Oracle's current_scn is the definitive end point
-        
+
         while batch_start < current_scn:
             batch_end = min(batch_start + batch_size, current_scn)
             batch_count += 1
-            
-            user_logger.info("Processing LogMiner batch %d: SCN range %s-%s", 
-                           batch_count, batch_start, batch_end)
-            
+
+            user_logger.info("Processing LogMiner batch %d: SCN range %s-%s", batch_count, batch_start, batch_end)
+
             # Process this batch (even if empty - gaps are normal in Oracle)
             records_processed = 0
             for record_tuple in self._process_logminer_batch(batch_start, batch_end):
                 records_processed += 1
                 yield record_tuple
-            
+
             user_logger.info("Batch %d completed: processed %d records", batch_count, records_processed)
-            
+
             # Move to next batch - always continue to current_scn
             batch_start = batch_end
-        
+
         # Ensure state is updated to the full range processed (current_scn)
         # This prevents reprocessing empty SCN ranges on next sync
         if batch_count > 0:  # Only if we processed at least one batch
             final_state_record = {self.replication_key: current_scn}
             self._increment_stream_state(final_state_record, context=None)
             user_logger.info("Updated state to processed SCN range end: %s", current_scn)
-        
+
         user_logger.info("Completed processing all LogMiner data: %d batches, processed up to SCN %s", batch_count, current_scn)
 
     def _fetch_current_scn(self) -> int:
@@ -307,7 +306,7 @@ class OracleSingleLogBasedStream(SQLStream):
         if not self._check_logs_available_for_scn_range(connection, start_scn, end_scn):
             user_logger.warning("No logs available for SCN range %s-%s", start_scn, end_scn)
             return False
-            
+
         start_logmnr_sql = """BEGIN
                              DBMS_LOGMNR.START_LOGMNR(
                                      startScn => :start_scn,
@@ -389,8 +388,7 @@ class OracleSingleLogBasedStream(SQLStream):
                     most_recent = archived_logs[0]
                     new_start_scn = most_recent[1]  # first_change#
                     new_end_scn = most_recent[2]  # next_change#
-                    user_logger.info("Adjusting to available archived log SCN range: %s-%s (was %s-%s)", 
-                                   new_start_scn, new_end_scn, start_scn, end_scn)
+                    user_logger.info("Adjusting to available archived log SCN range: %s-%s (was %s-%s)", new_start_scn, new_end_scn, start_scn, end_scn)
                     start_scn = new_start_scn
                     end_scn = new_end_scn
 
@@ -494,7 +492,7 @@ class OracleSingleLogBasedStream(SQLStream):
             pass  # Ignore errors in guidance detection
 
         user_logger.error("========================================")
-        
+
     def _check_logs_available_for_scn_range(self, connection, start_scn: int, end_scn: int) -> bool:
         """Check if archived logs are available for the given SCN range."""
         cursor = connection.cursor()
@@ -516,16 +514,16 @@ class OracleSingleLogBasedStream(SQLStream):
                 """,
                 {"start_scn": start_scn, "end_scn": end_scn},
             )
-            
+
             count = cursor.fetchone()[0]
             return count > 0
-            
+
         except Exception as e:
             user_logger.warning("Error checking log availability: %s", e)
             return False
         finally:
             cursor.close()
-            
+
     def _get_available_scn_range(self, connection, requested_start: int, requested_end: int) -> tuple[int | None, int | None]:
         """Get the actual SCN range available in archived logs."""
         cursor = connection.cursor()
@@ -541,7 +539,7 @@ class OracleSingleLogBasedStream(SQLStream):
                   AND first_time > SYSDATE - 7  -- Only consider logs from last 7 days
                 """
             )
-            
+
             result = cursor.fetchone()
             if result and result[0] is not None and result[1] is not None:
                 min_scn, max_scn = result
@@ -550,7 +548,7 @@ class OracleSingleLogBasedStream(SQLStream):
             else:
                 user_logger.warning("No available archived logs found")
                 return None, None
-                
+
         except Exception as e:
             user_logger.warning("Error getting available SCN range: %s", e)
             return None, None
@@ -603,7 +601,7 @@ class OracleSingleLogBasedStream(SQLStream):
 
             # Process all streams for this batch
             yield from self._process_all_streams_logminer(connection, start_scn, end_scn)
-            
+
         except Exception as e:
             user_logger.error("Error during LogMiner batch processing: %s", e)
             raise
@@ -651,7 +649,7 @@ class OracleSingleLogBasedStream(SQLStream):
 
         # Build a single LogMiner query for all streams and columns
         mine_sql = self._build_unified_logminer_query(all_columns)
-        
+
         # Debug: Log the generated SQL
         user_logger.info("Generated LogMiner SQL: %s", mine_sql)
 
@@ -659,21 +657,18 @@ class OracleSingleLogBasedStream(SQLStream):
         cursor = connection.cursor()
         try:
             # Add SCN range filtering to the query for better performance
-            bounded_sql = mine_sql.replace(
-                "ORDER BY SCN, CSCN",
-                f"  AND CSCN BETWEEN {start_scn} AND {end_scn}\nORDER BY CSCN, SCN"
-            )
-            
+            bounded_sql = mine_sql.replace("ORDER BY SCN, CSCN", f"  AND CSCN BETWEEN {start_scn} AND {end_scn}\nORDER BY CSCN, SCN")
+
             # Also limit the result set size for better performance
             max_rows = self.config.get("logminer_max_rows_per_batch", 10000)
             if max_rows > 0:
                 bounded_sql = f"""SELECT * FROM (
 {bounded_sql}
 ) WHERE ROWNUM <= {max_rows}"""
-            
+
             user_logger.debug("Executing bounded LogMiner query: %s", bounded_sql)
             cursor.execute(bounded_sql)
-            
+
             # Quick check to see if there are any rows at all
             row_check_cursor = connection.cursor()
             try:
@@ -686,13 +681,12 @@ class OracleSingleLogBasedStream(SQLStream):
                 row_check_cursor.execute(check_sql)
                 result = row_check_cursor.fetchone()
                 total_rows, dml_rows = result if result else (0, 0)
-                user_logger.info("LogMiner content check for SCN %s-%s: %d total rows, %d DML rows", 
-                               start_scn, end_scn, total_rows, dml_rows)
+                user_logger.info("LogMiner content check for SCN %s-%s: %d total rows, %d DML rows", start_scn, end_scn, total_rows, dml_rows)
             except Exception as e:
                 user_logger.debug("Could not check LogMiner content: %s", e)
             finally:
                 row_check_cursor.close()
-            
+
             # Process results (row limit is now handled in SQL)
             row_count = 0
 
@@ -719,55 +713,56 @@ class OracleSingleLogBasedStream(SQLStream):
                 stream = stream_info["stream"]
                 stream_columns = stream_info["columns"]
 
-                # Get additional fields from the enhanced query 
+                # Get additional fields from the enhanced query
                 sql_redo = row[6]
                 sql_undo = row[7]
                 # row_id = row[8]  # Not used
                 # rollback = row[9]  # Not used
 
-                user_logger.debug("Processing LogMiner row %d: %s.%s %s (SCN: %s)", 
-                               row_count, schema_name, table_name, operation, cscn)
+                user_logger.debug("Processing LogMiner row %d: %s.%s %s (SCN: %s)", row_count, schema_name, table_name, operation, cscn)
                 user_logger.debug("SQL_REDO: %s", sql_redo)
                 user_logger.debug("SQL_UNDO: %s", sql_undo)
-                
+
                 # Extract column values and reconstruct full record
-                record = self._reconstruct_full_record(
-                    sql_redo, sql_undo, operation, stream_columns, 
-                    schema_name, table_name
-                )
-                
+                record = self._reconstruct_full_record(sql_redo, sql_undo, operation, stream_columns, schema_name, table_name)
+
                 # Apply proper type conversions based on stream schema
                 record = self._apply_schema_types(record, stream)
-                
+
                 # Add Singer CDC columns
                 record["_sdc_lsn"] = int(cscn)  # Use commit SCN as LSN as integer
-                
+
                 if operation == "DELETE":
                     record["_sdc_deleted_at"] = commit_timestamp.isoformat() if commit_timestamp else None
                 else:
                     record["_sdc_deleted_at"] = None
-                
+
                 # Check for missing columns - this should not happen for INSERT/DELETE
                 expected_columns = set(stream_columns) - {"_sdc_lsn", "_sdc_deleted_at"}
                 actual_columns = set(record.keys()) - {"_sdc_lsn", "_sdc_deleted_at"}
                 missing_columns = expected_columns - actual_columns
-                
+
                 if missing_columns:
                     if operation in ("INSERT", "DELETE"):
-                        user_logger.warning("Missing columns for %s operation on %s.%s (this should not happen): %s", 
-                                         operation, schema_name, table_name, sorted(missing_columns))
+                        user_logger.warning(
+                            "Missing columns for %s operation on %s.%s (this should not happen): %s",
+                            operation,
+                            schema_name,
+                            table_name,
+                            sorted(missing_columns),
+                        )
                         user_logger.warning("SQL_REDO: %s", sql_redo)
                         user_logger.warning("SQL_UNDO: %s", sql_undo)
                     else:
-                        user_logger.debug("Missing columns for %s operation on %s.%s (expected): %s", 
-                                         operation, schema_name, table_name, sorted(missing_columns))
-                    
+                        user_logger.debug(
+                            "Missing columns for %s operation on %s.%s (expected): %s", operation, schema_name, table_name, sorted(missing_columns)
+                        )
+
                     # Only fill with null for UPDATE operations where we truly can't get the values
                     # For INSERT/DELETE, this indicates a parsing problem that needs investigation
                     if operation == "UPDATE":
                         for missing_col in missing_columns:
                             record[missing_col] = None
-                
 
                 yield record, stream.name
 
@@ -784,13 +779,13 @@ class OracleSingleLogBasedStream(SQLStream):
 
     def _build_unified_logminer_query(self, all_columns: set[str]) -> str:
         """Build a unified LogMiner query following Oracle best practices.
-        
+
         This implementation follows the Oracle LogMiner Utility documentation:
         https://docs.oracle.com/en/database/oracle/oracle-database/19/sutil/oracle-logminer-utility.html
         """
         # Sort columns for consistent ordering
         sorted_columns = sorted(all_columns)
-        
+
         # Build table and schema filters from our selected streams
         table_conditions = []
         for stream in self.log_based_streams:
@@ -799,14 +794,14 @@ class OracleSingleLogBasedStream(SQLStream):
             fully_qualified = str(stream.fully_qualified_name)
             if "." in fully_qualified:
                 schema_name, table_name = fully_qualified.split(".", 1)
-                table_conditions.append(f"(SEG_OWNER = '{schema_name.upper()}' AND TABLE_NAME = '{table_name.upper()}')") 
-        
+                table_conditions.append(f"(SEG_OWNER = '{schema_name.upper()}' AND TABLE_NAME = '{table_name.upper()}')")
+
         table_filter = " OR ".join(table_conditions) if table_conditions else "1=1"
-        
+
         # Use Oracle LogMiner's standard approach with essential columns
         # We'll extract column values using SQL parsing since MINE_VALUE has issues
         user_logger.info("Using Oracle LogMiner standard query with %d columns", len(sorted_columns))
-        
+
         query = f"""
         SELECT 
             OPERATION,
@@ -830,177 +825,138 @@ class OracleSingleLogBasedStream(SQLStream):
 
         return query
 
-    def _reconstruct_full_record(self, sql_redo: str, sql_undo: str, operation: str, 
-                                stream_columns: list, schema_name: str, table_name: str) -> dict:
+    def _reconstruct_full_record(self, sql_redo: str, sql_undo: str, operation: str, stream_columns: list, schema_name: str, table_name: str) -> dict:
         """Reconstruct full record from LogMiner SQL statements.
-        
+
         Following Oracle LogMiner best practices:
         - INSERT: SQL_REDO contains all column values
         - UPDATE: SQL_REDO has new values, SQL_UNDO has old values for changed columns
         - DELETE: SQL_UNDO contains all original column values (as INSERT statement)
         """
         record = {}
-        
-        try:
-            if operation == "INSERT":
-                # For INSERT, SQL_REDO contains the complete INSERT statement
-                # Example: insert into "NEKT"."NEWTABLE"("ID","VALUE") values ('1','test_value');
-                record = self._parse_insert_sql(sql_redo, stream_columns)
-                
-            elif operation == "UPDATE":
-                # For UPDATE, we need both REDO and UNDO to get the complete record
-                # SQL_REDO: update "NEKT"."NEWTABLE" set "VALUE" = 'new_value' where "ID" = '1';
-                # SQL_UNDO: update "NEKT"."NEWTABLE" set "VALUE" = 'old_value' where "ID" = '1';
-                
-                # Get changed values from REDO (SET clause) - these are the new values
-                changed_values = self._parse_update_sql(sql_redo, stream_columns)
-                
-                # Get key values from WHERE clause (these are unchanged)
-                where_values = self._parse_update_where_clause(sql_redo, stream_columns)
-                
-                # Get old values from UNDO (SET clause) - these are the previous values for changed columns
-                old_changed_values = self._parse_update_sql(sql_undo, stream_columns)
-                
-                # Start with key values from WHERE clause
-                record = where_values.copy()
-                
-                # Add the new values from REDO SET clause (changed columns)
-                record.update(changed_values)
-                
-                # For columns that weren't changed, we need to get them from somewhere
-                # The issue is Oracle LogMiner doesn't provide unchanged column values
-                # We'll need to accept that some columns may be missing for UPDATE operations
-                # This is a known limitation of Oracle LogMiner
-                
-                user_logger.debug("UPDATE reconstruction - WHERE: %s, CHANGED: %s, OLD: %s", 
-                               where_values, changed_values, old_changed_values)
-                
-            elif operation == "DELETE":
-                # For DELETE, SQL_UNDO contains the INSERT that would restore the row
-                # This gives us all the original column values
-                record = self._parse_insert_sql(sql_undo, stream_columns)
-                
-        except Exception as e:
-            user_logger.warning("Failed to reconstruct full record for %s.%s: %s", 
-                              schema_name, table_name, e)
-            user_logger.debug("SQL_REDO: %s", sql_redo)
-            user_logger.debug("SQL_UNDO: %s", sql_undo)
-            
-            # Fallback: try to extract any values we can using simpler parsing
-            record = self._extract_values_from_sql(sql_redo, sql_undo, operation, stream_columns)
-        
+
+        if operation == "INSERT":
+            # For INSERT, SQL_REDO contains the complete INSERT statement
+            # Example: insert into "NEKT"."NEWTABLE"("ID","VALUE") values ('1','test_value');
+            record = self._parse_insert_delete_sql(sql_redo, stream_columns)
+
+        elif operation == "UPDATE":
+            # For UPDATE, we need both REDO and UNDO to get the complete record
+            # SQL_REDO: update "NEKT"."NEWTABLE" set "VALUE" = 'new_value' where "ID" = '1';
+            # SQL_UNDO: update "NEKT"."NEWTABLE" set "VALUE" = 'old_value' where "ID" = '1';
+
+            # Get changed values from REDO (SET clause) - these are the new values
+            changed_values = self._parse_update_sql(sql_redo, stream_columns)
+
+            # Get key values from WHERE clause (these are unchanged)
+            where_values = self._parse_update_where_clause(sql_redo, stream_columns)
+
+            # Get old values from UNDO (SET clause) - these are the previous values for changed columns
+            old_changed_values = self._parse_update_sql(sql_undo, stream_columns)
+
+            # Start with key values from WHERE clause
+            record = where_values.copy()
+
+            # Add the new values from REDO SET clause (changed columns)
+            record.update(changed_values)
+
+            # For columns that weren't changed, we need to get them from somewhere
+            # The issue is Oracle LogMiner doesn't provide unchanged column values
+            # We'll need to accept that some columns may be missing for UPDATE operations
+            # This is a known limitation of Oracle LogMiner
+
+            user_logger.debug("UPDATE reconstruction - WHERE: %s, CHANGED: %s, OLD: %s", where_values, changed_values, old_changed_values)
+
+        elif operation == "DELETE":
+            # For DELETE, SQL_UNDO contains the INSERT that would restore the row
+            # This gives us all the original column values
+            record = self._parse_insert_delete_sql(sql_undo, stream_columns)
+
         return record
 
-    def _extract_values_from_sql(self, sql_redo: str, sql_undo: str, operation: str, stream_columns: list) -> dict:
-        """Extract column values from SQL_REDO/SQL_UNDO statements using regex patterns."""
-        record = {}
-        
-        try:
-            if operation in ("INSERT", "UPDATE") and sql_redo:
-                # Parse INSERT/UPDATE from REDO SQL
-                # Example: insert into "NEKT"."NEWTABLE"("ID","VALUE","DATE_TEST") values ('1','test','2023-01-01');
-                # Example: update "NEKT"."NEWTABLE" set "VALUE" = 'updated' where "ID" = '1';
-                
-                if operation == "INSERT" and "insert into" in sql_redo.lower():
-                    record = self._parse_insert_sql(sql_redo, stream_columns)
-                elif operation == "UPDATE" and "update" in sql_redo.lower():
-                    record = self._parse_update_sql(sql_redo, stream_columns)
-                    
-            elif operation == "DELETE" and sql_undo:
-                # Parse DELETE from UNDO SQL (which shows the original INSERT)
-                # The UNDO for a DELETE is typically an INSERT with the original values
-                if "insert into" in sql_undo.lower():
-                    record = self._parse_insert_sql(sql_undo, stream_columns)
-                    
-        except Exception as e:
-            user_logger.warning("Failed to parse SQL for column values: %s", e)
-            user_logger.debug("SQL_REDO: %s", sql_redo)
-            user_logger.debug("SQL_UNDO: %s", sql_undo)
-        
-        return record
-
-    def _parse_insert_sql(self, sql: str, stream_columns: list) -> dict:
+    def _parse_insert_delete_sql(self, sql: str, stream_columns: list) -> dict:
         """Parse INSERT SQL to extract column values."""
         import re
+
         record = {}
-        
+
         # Extract the table columns part
-        columns_match = re.search(r'insert into [^(]+\(([^)]+)\)\s*values', sql, re.IGNORECASE)
+        columns_match = re.search(r"insert into [^(]+\(([^)]+)\)\s*values", sql, re.IGNORECASE)
         if not columns_match:
             user_logger.warning("Failed to match INSERT SQL columns pattern: %s", sql)
             return record
-            
+
         columns_str = columns_match.group(1)
-        
+
         # Extract the values part by finding the VALUES keyword and getting everything after it
-        values_match = re.search(r'\bvalues\s*\((.+)\)\s*;?\s*$', sql, re.IGNORECASE | re.DOTALL)
+        values_match = re.search(r"\bvalues\s*\((.+)\)\s*;?\s*$", sql, re.IGNORECASE | re.DOTALL)
         if not values_match:
             user_logger.warning("Failed to match INSERT SQL values pattern: %s", sql)
             return record
-            
+
         values_str = values_match.group(1)
-        
+
         # Extract column names (remove quotes)
-        columns = [col.strip().strip('"').lower() for col in columns_str.split(',')]
-        
+        columns = [col.strip().strip('"').lower() for col in columns_str.split(",")]
+
         # Extract values (handle quoted strings and Oracle functions)
         values = self._parse_sql_values(values_str)
-        
+
         # Create case-insensitive lookup for stream columns
         stream_columns_lower = [sc.lower() for sc in stream_columns]
-        
+
         # Map columns to values
         for i, col in enumerate(columns):
             if i < len(values) and col in stream_columns_lower:
                 record[col] = values[i]
-        
+
         return record
 
     def _parse_update_sql(self, sql: str, stream_columns: list) -> dict:
         """Parse UPDATE SQL to extract new column values."""
         import re
+
         record = {}
-        
+
         # Pattern for UPDATE: update "SCHEMA"."TABLE" set "COL1" = 'val1', "COL2" = 'val2' where ...
-        pattern = r'set\s+(.+?)\s+where'
+        pattern = r"set\s+(.+?)\s+where"
         match = re.search(pattern, sql, re.IGNORECASE | re.DOTALL)
-        
+
         if match:
             set_clause = match.group(1)
-            
+
             # Enhanced pattern to handle Oracle functions in assignments
             # Matches: "COL" = 'value' or "COL" = to_date(...) etc.
             assignments = re.findall(r'"([^"]+)"\s*=\s*((?:to_\w+\s*\([^)]*\))|(?:\'[^\']*\')|(?:[^,\s]+))', set_clause, re.IGNORECASE)
-            
+
             for col_name, value_str in assignments:
                 if col_name.lower() in [sc.lower() for sc in stream_columns]:
                     # Parse the value (handle quotes, nulls, and Oracle functions)
                     parsed_value = self._parse_single_sql_value(value_str.strip())
                     record[col_name.lower()] = parsed_value
-        
+
         return record
 
     def _parse_sql_values(self, values_str: str) -> list:
         """Parse comma-separated SQL values, handling quotes, nulls, and Oracle functions."""
         values = []
-        
-        
+
         # Enhanced pattern to handle Oracle functions with nested parentheses and quoted strings
         # This pattern matches:
         # 1. Oracle functions: TO_DATE(...), TO_TIMESTAMP(...), etc. with nested quotes and parentheses
         # 2. Quoted strings: 'value'
         # 3. Other values: numbers, NULL, etc.
-        
+
         # Use a more sophisticated approach to handle nested parentheses in Oracle functions
         tokens = []
         current_token = ""
         paren_count = 0
         in_quotes = False
         i = 0
-        
+
         while i < len(values_str):
             char = values_str[i]
-            
+
             if char == "'" and not in_quotes:
                 in_quotes = True
                 current_token += char
@@ -1027,14 +983,13 @@ class OracleSingleLogBasedStream(SQLStream):
                 current_token = ""
             else:
                 current_token += char
-            
+
             i += 1
-        
+
         # Add the last token
         if current_token.strip():
             tokens.append(current_token.strip())
-        
-        
+
         # Parse each token
         for token in tokens:
             parsed_value = self._parse_single_sql_value(token.strip())
@@ -1044,37 +999,39 @@ class OracleSingleLogBasedStream(SQLStream):
     def _parse_single_sql_value(self, value_str: str) -> str | int | float | None:
         """Parse a single SQL value, handling quotes, nulls, Oracle functions, and type conversion."""
         value_str = value_str.strip()
-        
-        if value_str.upper() == 'NULL':
+
+        if value_str.upper() == "NULL":
             return None
         elif value_str.startswith("'") and value_str.endswith("'"):
             # Remove quotes and handle escaped quotes
             return value_str[1:-1].replace("''", "'")
-        elif (value_str.lower().startswith(('to_date(', 'to_timestamp(', 'to_number(', 'to_clob(', 'to_blob(', 'to_char(', 'hextoraw(', 'rawtohex(')) or 
-              ('yyyy-mm-dd' in value_str.lower() and 'hh24:mi:ss' in value_str.lower()) or
-              (value_str.lower().startswith('to_date(') and not value_str.endswith(')'))):
+        elif (
+            value_str.lower().startswith(("to_date(", "to_timestamp(", "to_number(", "to_clob(", "to_blob(", "to_char(", "hextoraw(", "rawtohex(", "empty_clob(", "empty_blob("))
+            or ("yyyy-mm-dd" in value_str.lower() and "hh24:mi:ss" in value_str.lower())
+            or (value_str.lower().startswith("to_date(") and not value_str.endswith(")"))
+        ):
             # Handle Oracle type conversion functions, incomplete functions, and format strings
             return self._parse_oracle_function(value_str)
         else:
             # Try to convert to numeric type if it looks like a number
             try:
-                if '.' in value_str:
+                if "." in value_str:
                     return float(value_str)
                 else:
                     return int(value_str)
             except ValueError:
                 # Not a number, return as string
                 return value_str
-            
+
     def _parse_oracle_function(self, func_str: str) -> str | int | float | None:
         """Parse Oracle function calls from LogMiner SQL and convert to proper Python types."""
         import re
-        
+
         func_str = func_str.strip()
-        
+
         # Handle incomplete TO_DATE function calls (missing closing quotes/parentheses)
         # Example: "TO_DATE('2024-03-06T00:00:00.00+00:00'" (incomplete)
-        if func_str.lower().startswith('to_date(') and not func_str.endswith(')'):
+        if func_str.lower().startswith("to_date(") and not func_str.endswith(")"):
             # Try to extract date string from incomplete function call
             match = re.search(r"to_date\s*\(\s*'([^']*)", func_str, re.IGNORECASE)
             if match:
@@ -1082,83 +1039,83 @@ class OracleSingleLogBasedStream(SQLStream):
                 if date_str:  # Only process if we got a non-empty date string
                     try:
                         # Parse with pendulum and return datetime format to match full table sync
-                        if 't' in date_str.lower():
+                        if "t" in date_str.lower():
                             # Format: 2024-03-05t00:00:00.00+00:00
-                            clean_date = date_str.replace('t', 'T')
-                            if '+00:00' in clean_date:
-                                clean_date = clean_date.replace('+00:00', 'Z')
+                            clean_date = date_str.replace("t", "T")
+                            if "+00:00" in clean_date:
+                                clean_date = clean_date.replace("+00:00", "Z")
                             parsed = pendulum.parse(clean_date)
-                            return parsed.format('YYYY-MM-DDTHH:mm:ss')  # Match full table format
+                            return parsed.format("YYYY-MM-DDTHH:mm:ss")  # Match full table format
                         else:
                             parsed = pendulum.parse(date_str)
-                            return parsed.format('YYYY-MM-DDTHH:mm:ss')
+                            return parsed.format("YYYY-MM-DDTHH:mm:ss")
                     except Exception as e:
                         user_logger.warning("Could not parse incomplete date '%s': %s", date_str, e)
                         return date_str
             return func_str
-        
+
         # Handle TO_DATE function: to_date('2024-03-05t00:00:00.00+00:00', 'format')
-        if func_str.lower().startswith('to_date('):
+        if func_str.lower().startswith("to_date("):
             # Extract the date string from to_date('date_string', ...)
             match = re.match(r"to_date\s*\(\s*'([^']+)'.*\)", func_str, re.IGNORECASE)
             if match:
                 date_str = match.group(1)
                 try:
                     # Parse with pendulum and return datetime format to match full table sync
-                    if 't' in date_str.lower():
+                    if "t" in date_str.lower():
                         # Format: 2024-03-05t00:00:00.00+00:00
-                        clean_date = date_str.replace('t', 'T')
-                        if '+00:00' in clean_date:
-                            clean_date = clean_date.replace('+00:00', 'Z')
+                        clean_date = date_str.replace("t", "T")
+                        if "+00:00" in clean_date:
+                            clean_date = clean_date.replace("+00:00", "Z")
                         parsed = pendulum.parse(clean_date)
-                        return parsed.format('YYYY-MM-DDTHH:mm:ss')  # Match full table format
+                        return parsed.format("YYYY-MM-DDTHH:mm:ss")  # Match full table format
                     else:
                         parsed = pendulum.parse(date_str)
-                        return parsed.format('YYYY-MM-DDTHH:mm:ss')
+                        return parsed.format("YYYY-MM-DDTHH:mm:ss")
                 except Exception as e:
                     user_logger.warning("Could not parse date '%s': %s", date_str, e)
                     return date_str
             return func_str
-            
+
         # Handle timestamp format strings that are not actual timestamps
         # Example: "YYYY-MM-DD\"T\"HH24:MI:SS.\"00+00:00\""
-        if 'yyyy-mm-dd' in func_str.lower() and 'hh24:mi:ss' in func_str.lower():
+        if "yyyy-mm-dd" in func_str.lower() and "hh24:mi:ss" in func_str.lower():
             # This looks like a timestamp format string rather than an actual timestamp
             # Return None or a default value since we can't extract a meaningful timestamp
             user_logger.warning("Got timestamp format string instead of actual timestamp: %s", func_str)
             return None
-        
+
         # Handle TO_TIMESTAMP function: to_timestamp('2024-05-23t14:30:15.123000+00:00', 'format')
-        elif func_str.lower().startswith('to_timestamp('):
+        elif func_str.lower().startswith("to_timestamp("):
             # Extract the timestamp string
             match = re.match(r"to_timestamp\s*\(\s*'([^']+)'.*\)", func_str, re.IGNORECASE)
             if match:
                 timestamp_str = match.group(1)
                 try:
                     # Parse with pendulum and return format matching full table sync
-                    if 't' in timestamp_str.lower():
+                    if "t" in timestamp_str.lower():
                         # Format: 2024-05-23t14:30:15.123000+00:00
-                        clean_timestamp = timestamp_str.replace('t', 'T')
-                        if '+00:00' in clean_timestamp:
-                            clean_timestamp = clean_timestamp.replace('+00:00', 'Z')
+                        clean_timestamp = timestamp_str.replace("t", "T")
+                        if "+00:00" in clean_timestamp:
+                            clean_timestamp = clean_timestamp.replace("+00:00", "Z")
                         parsed = pendulum.parse(clean_timestamp)
-                        return parsed.format('YYYY-MM-DDTHH:mm:ss.SSSSSS')  # Match full table format (no timezone)
+                        return parsed.format("YYYY-MM-DDTHH:mm:ss.SSSSSS")  # Match full table format (no timezone)
                     else:
                         parsed = pendulum.parse(timestamp_str)
-                        return parsed.format('YYYY-MM-DDTHH:mm:ss.SSSSSS')
+                        return parsed.format("YYYY-MM-DDTHH:mm:ss.SSSSSS")
                 except Exception as e:
                     user_logger.warning("Could not parse timestamp '%s': %s", timestamp_str, e)
                     return timestamp_str
             return func_str
-            
+
         # Handle TO_NUMBER function: to_number('123.45')
-        elif func_str.lower().startswith('to_number('):
+        elif func_str.lower().startswith("to_number("):
             match = re.match(r"to_number\s*\(\s*'([^']+)'.*\)", func_str, re.IGNORECASE)
             if match:
                 number_str = match.group(1)
                 try:
                     # Convert to proper numeric type
-                    if '.' in number_str:
+                    if "." in number_str:
                         return float(number_str)
                     else:
                         return int(number_str)
@@ -1166,16 +1123,16 @@ class OracleSingleLogBasedStream(SQLStream):
                     user_logger.warning("Could not convert '%s' to number", number_str)
                     return number_str
             return func_str
-            
+
         # Handle TO_CLOB/TO_BLOB - just extract the string value
-        elif func_str.lower().startswith(('to_clob(', 'to_blob(')):
+        elif func_str.lower().startswith(("to_clob(", "to_blob(")):
             match = re.match(r"to_[cb]lob\s*\(\s*'([^']+)'.*\)", func_str, re.IGNORECASE)
             if match:
                 return match.group(1)
             return func_str
-            
+
         # Handle TO_CHAR function: to_char(date_val, 'format') or to_char(number_val)
-        elif func_str.lower().startswith('to_char('):
+        elif func_str.lower().startswith("to_char("):
             # Extract the first parameter (the value being converted)
             match = re.match(r"to_char\s*\(\s*'([^']+)'.*\)", func_str, re.IGNORECASE)
             if match:
@@ -1185,92 +1142,98 @@ class OracleSingleLogBasedStream(SQLStream):
             if match:
                 return match.group(1).strip()
             return func_str
-            
+
         # Handle HEXTORAW function: hextoraw('48656C6C6F')
-        elif func_str.lower().startswith('hextoraw('):
+        elif func_str.lower().startswith("hextoraw("):
             match = re.match(r"hextoraw\s*\(\s*'([^']+)'.*\)", func_str, re.IGNORECASE)
             if match:
                 hex_str = match.group(1)
                 # Convert hex to bytes, then to string if possible
                 try:
-                    return bytes.fromhex(hex_str).decode('utf-8', errors='ignore')
+                    return bytes.fromhex(hex_str).decode("utf-8", errors="ignore")
                 except Exception:
                     return hex_str
             return func_str
-            
+
         # Handle RAWTOHEX function: rawtohex(raw_value)
-        elif func_str.lower().startswith('rawtohex('):
+        elif func_str.lower().startswith("rawtohex("):
             match = re.match(r"rawtohex\s*\(\s*'([^']+)'.*\)", func_str, re.IGNORECASE)
             if match:
                 return match.group(1)  # Return the hex representation as-is
             return func_str
             
+        # Handle EMPTY_CLOB() and EMPTY_BLOB() functions
+        elif func_str.lower() in ('empty_clob()', 'empty_blob()'):
+            # These Oracle functions represent empty LOB values, return null
+            return None
+
         # Unknown function, return as-is
         return func_str
 
     def _parse_update_where_clause(self, sql: str, stream_columns: list) -> dict:
         """Parse UPDATE WHERE clause to extract column values (these are unchanged values)."""
         import re
+
         record = {}
-        
+
         try:
             # Extract WHERE clause from UPDATE statement
             # Pattern: update table set col1='val1' where col2='val2' and col3='val3'
-            if 'where' in sql.lower():
-                where_part = sql.lower().split('where')[1].strip()
+            if "where" in sql.lower():
+                where_part = sql.lower().split("where")[1].strip()
                 # Remove any trailing semicolon
-                where_part = where_part.rstrip(';')
-                
+                where_part = where_part.rstrip(";")
+
                 # Enhanced pattern to handle Oracle functions in WHERE clause
                 # Matches: "COL" = 'value' or "COL" = to_date(...) etc.
                 conditions = re.findall(r'"([^"]+)"\s*=\s*((?:to_\w+\s*\([^)]*\))|(?:\'[^\']*\')|(?:[^\s\)]+))', where_part, re.IGNORECASE)
-                
+
                 for col_name, value_str in conditions:
                     if col_name.lower() in [sc.lower() for sc in stream_columns]:
                         parsed_value = self._parse_single_sql_value(value_str.strip())
                         record[col_name.lower()] = parsed_value
-                        
+
         except Exception as e:
             user_logger.debug("Could not parse UPDATE WHERE clause: %s", e)
-            
+
         return record
-    
+
     def _apply_schema_types(self, record: dict, stream) -> dict:
         """Apply proper type conversions based on the stream schema."""
         if not record:
             return record
-            
+
         schema_properties = stream.schema.get("properties", {})
         typed_record = {}
-        
+
         for column, value in record.items():
             if value is None:
                 typed_record[column] = None
                 continue
-                
+
             # Get the column schema
             column_schema = schema_properties.get(column, {})
             column_type = column_schema.get("type", [])
             column_format = column_schema.get("format")
-            
+
             # Handle nullable types (e.g., ["string", "null"])
             if isinstance(column_type, list):
                 non_null_types = [t for t in column_type if t != "null"]
                 column_type = non_null_types[0] if non_null_types else "string"
-            
+
             try:
                 if column_type == "integer":
                     if isinstance(value, str):
                         typed_record[column] = int(float(value))  # Handle "7.0" -> 7
                     else:
                         typed_record[column] = int(value)
-                        
+
                 elif column_type == "number":
                     if isinstance(value, str):
                         typed_record[column] = float(value)
                     else:
                         typed_record[column] = float(value)
-                        
+
                 elif column_type == "string":
                     if column_format == "date":
                         # Match full table format: YYYY-MM-DDTHH:MM:SS (with time component)
@@ -1278,35 +1241,34 @@ class OracleSingleLogBasedStream(SQLStream):
                             try:
                                 parsed = pendulum.parse(value)
                                 # Format as datetime to match full table sync
-                                typed_record[column] = parsed.format('YYYY-MM-DDTHH:mm:ss')
+                                typed_record[column] = parsed.format("YYYY-MM-DDTHH:mm:ss")
                             except Exception:
                                 typed_record[column] = str(value)
                         else:
                             typed_record[column] = str(value)
-                            
+
                     elif column_format == "date-time":
                         # Match full table format: YYYY-MM-DDTHH:MM:SS.ssssss (no timezone)
                         if isinstance(value, str):
                             try:
                                 parsed = pendulum.parse(value)
                                 # Format without timezone to match full table sync
-                                typed_record[column] = parsed.format('YYYY-MM-DDTHH:mm:ss.SSSSSS')
+                                typed_record[column] = parsed.format("YYYY-MM-DDTHH:mm:ss.SSSSSS")
                             except Exception:
                                 typed_record[column] = str(value)
                         else:
                             typed_record[column] = str(value)
                     else:
                         typed_record[column] = str(value)
-                        
+
                 else:
                     # Default: keep as-is
                     typed_record[column] = value
-                    
+
             except (ValueError, TypeError) as e:
-                user_logger.warning("Type conversion failed for column %s (value: %s, type: %s): %s", 
-                                  column, value, column_type, e)
+                user_logger.warning("Type conversion failed for column %s (value: %s, type: %s): %s", column, value, column_type, e)
                 typed_record[column] = value  # Keep original value on error
-                
+
         return typed_record
 
     def post_process(self, row: dict, context: dict | None = None) -> dict | None:
@@ -1361,4 +1323,3 @@ class OracleSingleLogBasedStream(SQLStream):
                 is_sorted=treat_as_sorted,
                 check_sorted=self.check_sorted,
             )
-
