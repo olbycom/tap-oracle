@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 tap-oracle is a Singer tap for Oracle databases, built with the Nekt Singer SDK. It extracts data from Oracle databases and outputs it in Singer format for use in ETL pipelines. The tap supports multiple replication methods including full table sync, incremental sync, and log-based replication using Oracle Log Miner.
 
+**Current Status**: The codebase is being refactored to use SQLAlchemy 2.x with improved stream architecture. The `sync_strategies` module has been removed in favor of a consolidated streams approach.
+
 ## Development Commands
 
 ### Environment Setup
@@ -73,9 +75,9 @@ mypy tap_oracle/
    - Includes custom type conformance for date/datetime handling
 
 3. **Stream Classes** (`tap_oracle/streams/`):
-   - **OracleStream**: Base stream class for full table and incremental replication
-   - **OracleLogBasedStream**: Individual log-based streams using Oracle Log Miner
-   - **OracleSingleLogBasedStream**: Coordinator for multiple log-based streams
+   - **OracleStream**: Base stream class for full table and incremental replication (in `common.py`)
+   - **OracleLogBasedStream**: Individual log-based streams using Oracle Log Miner (in `log_based.py`)
+   - **OracleSingleLogBasedStream**: Coordinator for multiple log-based streams (in `single_log_based.py`)
 
 4. **SSH Tunnel Support** (`tap_oracle/ssh_tunnel.py`): SSH tunneling for secure connections
 
@@ -107,6 +109,7 @@ The tap accepts either individual connection parameters or a complete SQLAlchemy
 - `ssh_tunnel`: SSH tunnel configuration object
 - `filter_schemas`: Array of schema names to process
 - `chunk_size`: Number of rows to fetch at once (0 = no chunking)
+- `date_format`: Custom date format configuration to handle date/datetime strings
 
 ## Testing Strategy
 
@@ -127,9 +130,10 @@ Tests are organized by functionality:
 
 ## Pre-commit Configuration
 
-The project uses pre-commit hooks for code quality:
-- JSON, TOML, YAML validation
+The project uses pre-commit hooks for code quality (configured in `.pre-commit-config.yaml`):
+- JSON, TOML, YAML validation (excluding VS Code launch.json)
 - Ruff formatting and linting
-- UV lock file management
+- UV lock file management and sync
 - GitHub workflow validation
 - Meltano configuration validation
+- Dependabot configuration validation
